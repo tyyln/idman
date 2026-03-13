@@ -2047,8 +2047,8 @@ function render() {
 // ── SCROLL LOCK ──
 let _scrollLocked = false;
 function _preventScroll(e) {
-  // Allow scrolling inside sidebar, modals, settings
-  const allowed = e.target.closest('.sidebar-body, .modal, .settings-sheet, .sidebar');
+  // Allow scrolling inside sidebar, modals, settings, and day tabs
+  const allowed = e.target.closest('.sidebar-body, .modal, .settings-sheet, .sidebar, .day-tabs');
   if (!allowed) e.preventDefault();
 }
 function lockScroll() {
@@ -2321,6 +2321,12 @@ function deleteExerciseLive(ei) {
     saveState();
     saveCurrentWeekToHistory();
     render();
+    // Egzersiz kalmadıysa en üste kaydır
+    if (state.days[activeDay].exercises.length === 0) {
+      const main = document.querySelector('.main');
+      if (main) main.scrollTop = 0;
+      window.scrollTo(0, 0);
+    }
   }, 620);
 }
 
