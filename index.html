@@ -355,6 +355,8 @@
     overflow: hidden;
     box-shadow: var(--shadow);
     transition: box-shadow 0.2s, transform 0.15s, border 0.15s;
+    user-select: none;
+    -webkit-user-select: none;
   }
   .workout-card:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); }
   .workout-card.drag-over { border: 2px solid var(--accent); transform: scale(1.01); }
@@ -2010,17 +2012,41 @@ function initDragDrop(cardEl, ei) {
     render();
   });
 
-  // Touch drag (mobile)
-  let touchStartY = 0, touchSrcIdx = null;
+  // Touch drag (mobile) — long press to activate
+  let touchStartY = 0, touchStartX = 0, touchSrcIdx = null, longPressTimer = null, dragActive = false;
+
   cardEl.addEventListener('touchstart', e => {
-    touchSrcIdx = ei;
     touchStartY = e.touches[0].clientY;
+    touchStartX = e.touches[0].clientX;
+    touchSrcIdx = ei;
+    dragActive = false;
+    longPressTimer = setTimeout(() => {
+      dragActive = true;
+      cardEl.style.opacity = '0.5';
+      cardEl.style.transform = 'scale(1.02)';
+    }, 500);
   }, { passive: true });
+
+  cardEl.addEventListener('touchmove', e => {
+    const dy = Math.abs(e.touches[0].clientY - touchStartY);
+    const dx = Math.abs(e.touches[0].clientX - touchStartX);
+    // Parmak hareket ederse long press iptal
+    if (dy > 8 || dx > 8) {
+      clearTimeout(longPressTimer);
+      longPressTimer = null;
+      if (!dragActive) touchSrcIdx = null;
+    }
+  }, { passive: true });
+
   cardEl.addEventListener('touchend', e => {
-    if (touchSrcIdx === null) return;
+    clearTimeout(longPressTimer);
+    longPressTimer = null;
+    cardEl.style.opacity = '';
+    cardEl.style.transform = '';
+    if (!dragActive || touchSrcIdx === null) { dragActive = false; touchSrcIdx = null; return; }
     const endY = e.changedTouches[0].clientY;
     const diff = endY - touchStartY;
-    if (Math.abs(diff) < 20) { touchSrcIdx = null; return; }
+    if (Math.abs(diff) < 30) { dragActive = false; touchSrcIdx = null; return; }
     const exs = state.days[activeDay].exercises;
     const dir = diff > 0 ? 1 : -1;
     const newIdx = Math.max(0, Math.min(exs.length - 1, touchSrcIdx + dir));
@@ -2030,6 +2056,7 @@ function initDragDrop(cardEl, ei) {
       saveState();
       render();
     }
+    dragActive = false;
     touchSrcIdx = null;
   }, { passive: true });
 }
