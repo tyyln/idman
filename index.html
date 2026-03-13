@@ -1107,7 +1107,7 @@
     <!-- Library -->
     <div style="margin-bottom:12px">
       <div id="libraryFilters" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px"></div>
-      <div id="libraryList" style="display:flex;flex-wrap:wrap;gap:6px;max-height:130px;overflow-y:auto"></div>
+      <div id="libraryList" style="display:flex;flex-wrap:wrap;gap:4px;max-height:96px;overflow-y:auto"></div>
     </div>
     <div class="modal-row">
       <div class="modal-field">
@@ -2413,7 +2413,7 @@ function renderLibrary() {
     group.exercises.forEach(name => {
       const chip = document.createElement('button');
       chip.textContent = name;
-      chip.style.cssText = 'padding:6px 12px;border-radius:20px;border:1px solid var(--border);font-size:12px;background:var(--surface2);color:var(--text);cursor:pointer;white-space:nowrap;';
+      chip.style.cssText = 'padding:4px 10px;border-radius:20px;border:1px solid var(--border);font-size:12px;background:var(--surface2);color:var(--text);cursor:pointer;white-space:nowrap;';
       chip.onclick = () => {
         document.getElementById('newExName').value = name;
         chip.style.background = 'var(--accent)';
