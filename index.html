@@ -827,6 +827,14 @@
     border-radius: 2px;
     margin: 0 auto 20px;
   }
+  .sidebar-handle-bar {
+    display: none;
+    width: 36px; height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin: 12px auto 4px;
+    flex-shrink: 0;
+  }
   .settings-sheet h3 {
     font-size: 16px; font-weight: 700;
     letter-spacing: -0.3px;
@@ -913,6 +921,7 @@
   }
   .sidebar-header h2 { font-size: 15px; font-weight: 600; }
   .sidebar-close { display: flex; }
+  .sidebar-handle-bar { display: block; }
 
   .sidebar-body {
     flex: 1;
@@ -1001,6 +1010,7 @@
 <!-- Sidebar panel -->
 <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
 <div class="sidebar" id="sidebar">
+  <div class="sidebar-handle-bar"></div>
   <div class="sidebar-header">
     <h2 id="sidebarTitle">📅 <span data-i18n="weekHistory"></span></h2>
     <button class="sidebar-close" onclick="closeSidebar()">✕</button>
@@ -1491,6 +1501,7 @@ function openPanel(panel) {
   if (panel === 'history') saveCurrentWeekToHistory();
   document.getElementById('sidebar').classList.add('open');
   document.getElementById('sidebarOverlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
   ['history','progress','weight'].forEach(p => {
     const key = p.charAt(0).toUpperCase() + p.slice(1);
     const btn = document.getElementById('navBtn' + key);
@@ -1506,14 +1517,18 @@ function openPanel(panel) {
   if (panel === 'history') renderSidebar();
   else if (panel === 'progress') renderProgressPanel();
   else if (panel === 'weight') renderWeightPanel();
+  initSidebarSwipe();
 }
 
 function openSidebar() { openPanel('history'); }
 
 function closeSidebar() {
   activePanel = null;
-  document.getElementById('sidebar').classList.remove('open');
+  const sidebar = document.getElementById('sidebar');
+  sidebar.classList.remove('open');
+  if (sidebar._swipeInit) { sidebar._swipeInit = false; }
   document.getElementById('sidebarOverlay').classList.remove('open');
+  document.body.style.overflow = '';
   ['History','Progress','Weight'].forEach(p => {
     const btn = document.getElementById('navBtn' + p);
     if (btn) btn.classList.remove('active');
@@ -2421,8 +2436,12 @@ function openAddExerciseModal() {
   libraryActiveGroup = null;
   renderLibrary();
   document.getElementById('addExerciseOverlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
 }
-function closeAddExerciseModal() { document.getElementById('addExerciseOverlay').classList.remove('open'); }
+function closeAddExerciseModal() {
+  document.getElementById('addExerciseOverlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
 function addExercise() {
   const name = document.getElementById('newExName').value.trim();
   if (!name) { document.getElementById('newExName').focus(); return; }
@@ -2521,6 +2540,42 @@ function initSettingsSwipe() {
   sheet.addEventListener('touchstart', onStart, { passive: true });
   sheet.addEventListener('touchmove', onMove, { passive: true });
   sheet.addEventListener('touchend', onEnd);
+}
+
+function initSidebarSwipe() {
+  const sidebar = document.getElementById('sidebar');
+  if (!sidebar || sidebar._swipeInit) return;
+  sidebar._swipeInit = true;
+  let startY = 0, currentY = 0, dragging = false;
+
+  function onStart(e) {
+    const touch = e.touches ? e.touches[0] : e;
+    startY = touch.clientY;
+    currentY = 0;
+    dragging = true;
+    sidebar.style.transition = 'none';
+  }
+  function onMove(e) {
+    if (!dragging) return;
+    const touch = e.touches ? e.touches[0] : e;
+    currentY = touch.clientY - startY;
+    if (currentY < 0) currentY = 0;
+    sidebar.style.transform = `translateY(${currentY}px)`;
+  }
+  function onEnd() {
+    if (!dragging) return;
+    dragging = false;
+    sidebar.style.transition = '';
+    if (currentY > 100) {
+      sidebar.style.transform = '';
+      closeSidebar();
+    } else {
+      sidebar.style.transform = '';
+    }
+  }
+  sidebar.addEventListener('touchstart', onStart, { passive: true });
+  sidebar.addEventListener('touchmove', onMove, { passive: false });
+  sidebar.addEventListener('touchend', onEnd);
 }
 
 function setWeightUnit(unit) {
