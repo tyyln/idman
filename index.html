@@ -1209,6 +1209,8 @@ const I18N = {
     pastWeeks: 'Geçmiş Haftalar',
     historyPanel: 'Hafta Geçmişi',
     progressPanel: 'İlerleme Grafiği',
+    progressChartTab: 'Grafik',
+    progressPRTab: 'PR',
     weightPanel: 'Vücut Ağırlığı',
     selectExercise: 'Egzersiz seç',
     noDataYet: 'Henüz veri yok.',
@@ -1284,6 +1286,8 @@ const I18N = {
     pastWeeks: 'Past Weeks',
     historyPanel: 'Week History',
     progressPanel: 'Progress Chart',
+    progressChartTab: 'Chart',
+    progressPRTab: 'PR',
     weightPanel: 'Body Weight',
     selectExercise: 'Select exercise',
     noDataYet: 'No data yet.',
@@ -1502,6 +1506,7 @@ function openPanel(panel) {
   if (panel === 'history') saveCurrentWeekToHistory();
   document.getElementById('sidebar').classList.add('open');
   document.getElementById('sidebarOverlay').classList.add('open');
+  unlockScroll();
   document.body.style.overflow = 'hidden';
   ['history','progress','weight'].forEach(p => {
     const key = p.charAt(0).toUpperCase() + p.slice(1);
@@ -1536,6 +1541,7 @@ function closeSidebar() {
     const mBtn = document.getElementById('mobileNav' + p);
     if (mBtn) mBtn.classList.remove('active');
   });
+  updateMainScroll();
 }
 
 function toggleSidebar() {
@@ -1600,119 +1606,241 @@ function renderProgressPanel() {
   const body = document.getElementById('sidebarBody');
   body.innerHTML = '';
 
-  // Collect all exercises across all days
-  const exercises = [];
-  state.days.forEach((day, di) => {
-    day.exercises.forEach((ex, ei) => {
-      exercises.push({ name: ex.name, di, ei });
-    });
-  });
+  // ── TABS ──
+  const tabBar = document.createElement('div');
+  tabBar.style.cssText = 'display:flex;gap:4px;padding:12px 16px 0;border-bottom:1px solid var(--border-light);margin-bottom:4px;';
 
-  if (exercises.length === 0) {
-    body.innerHTML = `<div style="padding:24px;text-align:center;color:var(--text-muted);font-size:13px">${t('noDataYet')}</div>`;
-    return;
+  let activeTab = 'chart';
+
+  function makeTab(id, labelKey) {
+    const btn = document.createElement('button');
+    btn.dataset.tab = id;
+    btn.textContent = t(labelKey);
+    btn.style.cssText = `padding:12px 24px;border:none;background:none;cursor:pointer;font-size:15px;font-weight:600;border-bottom:2px solid transparent;margin-bottom:-1px;color:var(--text-secondary);transition:color 0.15s,border-color 0.15s;border-radius:0;flex:1;text-align:center;`;
+    btn.onclick = () => {
+      activeTab = id;
+      tabBar.querySelectorAll('button').forEach(b => {
+        const isActive = b.dataset.tab === id;
+        b.style.color = isActive ? 'var(--accent)' : 'var(--text-secondary)';
+        b.style.borderBottomColor = isActive ? 'var(--accent)' : 'transparent';
+      });
+      contentWrap.innerHTML = '';
+      if (id === 'chart') drawChartTab();
+      else drawPRTab();
+    };
+    return btn;
   }
 
-  // Exercise selector
-  const sel = document.createElement('select');
-  sel.style.cssText = 'width:calc(100% - 32px);padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:14px;margin:16px 16px 12px;cursor:pointer;display:block;';
-  exercises.forEach((ex, idx) => {
-    const opt = document.createElement('option');
-    opt.value = idx;
-    opt.textContent = ex.name;
-    sel.appendChild(opt);
-  });
-  body.appendChild(sel);
+  const chartTab = makeTab('chart', 'progressChartTab');
+  const prTab = makeTab('pr', 'progressPRTab');
+  chartTab.style.color = 'var(--accent)';
+  chartTab.style.borderBottomColor = 'var(--accent)';
+  tabBar.appendChild(chartTab);
+  tabBar.appendChild(prTab);
+  body.appendChild(tabBar);
 
-  const chartWrap = document.createElement('div');
-  chartWrap.style.cssText = 'padding:0 16px';
-  body.appendChild(chartWrap);
+  const contentWrap = document.createElement('div');
+  body.appendChild(contentWrap);
 
-  function drawChart(exIdx) {
-    chartWrap.innerHTML = '';
-    const ex = exercises[exIdx];
-    // Gather weekly max kg for this exercise
-    const dataPoints = [];
-    const sortedKeys = Object.keys(history).sort();
-    sortedKeys.forEach(key => {
-      const hw = history[key];
-      if (!hw.sets) return;
-      let maxKg = 0;
-      const dayEx = hw.days?.[ex.di]?.exercises?.[ex.ei];
-      const exSets = dayEx?.sets || state.days[ex.di].exercises[ex.ei]?.sets || 3;
-      for (let s = 0; s < exSets; s++) {
-        const sd = hw.sets[`${ex.di}-${ex.ei}-${s}`];
-        if (sd?.done && sd.kg) maxKg = Math.max(maxKg, parseFloat(sd.kg) || 0);
-      }
-      if (maxKg > 0) dataPoints.push({ label: weekLabel(key), kg: maxKg });
+  // ── CHART TAB ──
+  function drawChartTab() {
+    const exercises = [];
+    state.days.forEach((day, di) => {
+      day.exercises.forEach((ex, ei) => {
+        exercises.push({ name: ex.name, di, ei });
+      });
     });
-    // Also add current week
-    let curMax = 0;
-    const curEx = state.days[ex.di].exercises[ex.ei];
-    if (curEx) {
-      for (let s = 0; s < curEx.sets; s++) {
-        const sd = sessionSets[`${ex.di}-${ex.ei}-${s}`];
-        if (sd?.done && sd.kg) curMax = Math.max(curMax, parseFloat(sd.kg) || 0);
-      }
-    }
-    if (curMax > 0) dataPoints.push({ label: t('now'), kg: curMax });
 
-    if (dataPoints.length === 0) {
-      chartWrap.innerHTML = `<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:13px">${t('noDataYet')}</div>`;
+    if (exercises.length === 0) {
+      contentWrap.innerHTML = `<div style="padding:24px;text-align:center;color:var(--text-muted);font-size:13px">${t('noDataYet')}</div>`;
       return;
     }
 
-    const maxVal = Math.max(...dataPoints.map(d => d.kg));
-    const minVal = Math.min(...dataPoints.map(d => d.kg));
-    const range = maxVal - minVal || 1;
-
-    // Scrollable bar chart — fixed bar width regardless of count
-    const BAR_W = 36, BAR_GAP = 16, H = 180, pad = 24;
-    const W = Math.max(300, dataPoints.length * (BAR_W + BAR_GAP) + pad * 2);
-
-    const scrollWrap = document.createElement('div');
-    scrollWrap.style.cssText = 'overflow-x:auto;-webkit-overflow-scrolling:touch;margin-top:8px;padding-bottom:4px';
-
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('viewBox', `0 0 ${W} ${H + 40}`);
-    svg.setAttribute('width', W);
-    svg.setAttribute('height', H + 40);
-    svg.style.cssText = 'display:block;min-width:100%';
-
-    dataPoints.forEach((d, i) => {
-      const x = pad + i * (BAR_W + BAR_GAP);
-      const barH = Math.max(8, ((d.kg - minVal) / range) * (H - 20) + 20);
-      const y = H - barH;
-      const isLast = i === dataPoints.length - 1;
-      const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-      rect.setAttribute('x', x); rect.setAttribute('y', y);
-      rect.setAttribute('width', BAR_W); rect.setAttribute('height', barH);
-      rect.setAttribute('rx', 5);
-      rect.setAttribute('fill', isLast ? 'var(--accent)' : 'var(--surface2)');
-      svg.appendChild(rect);
-
-      const val = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      val.setAttribute('x', x + BAR_W / 2); val.setAttribute('y', y - 5);
-      val.setAttribute('text-anchor', 'middle');
-      val.setAttribute('font-size', '10'); val.setAttribute('fill', 'var(--text-secondary)');
-      val.textContent = d.kg + weightUnit;
-      svg.appendChild(val);
-
-      const lbl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      lbl.setAttribute('x', x + BAR_W / 2); lbl.setAttribute('y', H + 16);
-      lbl.setAttribute('text-anchor', 'middle');
-      lbl.setAttribute('font-size', '9'); lbl.setAttribute('fill', 'var(--text-muted)');
-      lbl.textContent = d.label;
-      svg.appendChild(lbl);
+    const sel = document.createElement('select');
+    sel.style.cssText = 'width:calc(100% - 32px);padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:14px;margin:16px 16px 12px;cursor:pointer;display:block;';
+    exercises.forEach((ex, idx) => {
+      const opt = document.createElement('option');
+      opt.value = idx;
+      opt.textContent = ex.name;
+      sel.appendChild(opt);
     });
-    scrollWrap.appendChild(svg);
-    chartWrap.appendChild(scrollWrap);
-    // Scroll to end to show latest data
-    requestAnimationFrame(() => { scrollWrap.scrollLeft = scrollWrap.scrollWidth; });
+    contentWrap.appendChild(sel);
+
+    const chartWrap = document.createElement('div');
+    chartWrap.style.cssText = 'padding:0 16px';
+    contentWrap.appendChild(chartWrap);
+
+    function drawChart(exIdx) {
+      chartWrap.innerHTML = '';
+      const ex = exercises[exIdx];
+      const dataPoints = [];
+      const sortedKeys = Object.keys(history).sort();
+      sortedKeys.forEach(key => {
+        const hw = history[key];
+        if (!hw.sets) return;
+        let maxKg = 0;
+        const dayEx = hw.days?.[ex.di]?.exercises?.[ex.ei];
+        const exSets = dayEx?.sets || state.days[ex.di].exercises[ex.ei]?.sets || 3;
+        for (let s = 0; s < exSets; s++) {
+          const sd = hw.sets[`${ex.di}-${ex.ei}-${s}`];
+          if (sd?.done && sd.kg) maxKg = Math.max(maxKg, parseFloat(sd.kg) || 0);
+        }
+        if (maxKg > 0) dataPoints.push({ label: weekLabel(key), kg: maxKg });
+      });
+      let curMax = 0;
+      const curEx = state.days[ex.di].exercises[ex.ei];
+      if (curEx) {
+        for (let s = 0; s < curEx.sets; s++) {
+          const sd = sessionSets[`${ex.di}-${ex.ei}-${s}`];
+          if (sd?.done && sd.kg) curMax = Math.max(curMax, parseFloat(sd.kg) || 0);
+        }
+      }
+      if (curMax > 0) dataPoints.push({ label: t('now'), kg: curMax });
+
+      if (dataPoints.length === 0) {
+        chartWrap.innerHTML = `<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:13px">${t('noDataYet')}</div>`;
+        return;
+      }
+
+      const maxVal = Math.max(...dataPoints.map(d => d.kg));
+      const minVal = Math.min(...dataPoints.map(d => d.kg));
+      const range = maxVal - minVal || 1;
+      const BAR_W = 36, BAR_GAP = 16, H = 180, pad = 24;
+      const W = Math.max(300, dataPoints.length * (BAR_W + BAR_GAP) + pad * 2);
+
+      const scrollWrap = document.createElement('div');
+      scrollWrap.style.cssText = 'overflow-x:auto;-webkit-overflow-scrolling:touch;margin-top:8px;padding-bottom:4px';
+
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('viewBox', `0 0 ${W} ${H + 40}`);
+      svg.setAttribute('width', W);
+      svg.setAttribute('height', H + 40);
+      svg.style.cssText = 'display:block;min-width:100%';
+
+      dataPoints.forEach((d, i) => {
+        const x = pad + i * (BAR_W + BAR_GAP);
+        const barH = Math.max(8, ((d.kg - minVal) / range) * (H - 20) + 20);
+        const y = H - barH;
+        const isLast = i === dataPoints.length - 1;
+        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        rect.setAttribute('x', x); rect.setAttribute('y', y);
+        rect.setAttribute('width', BAR_W); rect.setAttribute('height', barH);
+        rect.setAttribute('rx', 5);
+        rect.setAttribute('fill', isLast ? 'var(--accent)' : 'var(--surface2)');
+        svg.appendChild(rect);
+
+        const val = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        val.setAttribute('x', x + BAR_W / 2); val.setAttribute('y', y - 5);
+        val.setAttribute('text-anchor', 'middle');
+        val.setAttribute('font-size', '10'); val.setAttribute('fill', 'var(--text-secondary)');
+        val.textContent = d.kg + weightUnit;
+        svg.appendChild(val);
+
+        const lbl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        lbl.setAttribute('x', x + BAR_W / 2); lbl.setAttribute('y', H + 16);
+        lbl.setAttribute('text-anchor', 'middle');
+        lbl.setAttribute('font-size', '9'); lbl.setAttribute('fill', 'var(--text-muted)');
+        lbl.textContent = d.label;
+        svg.appendChild(lbl);
+      });
+      scrollWrap.appendChild(svg);
+      chartWrap.appendChild(scrollWrap);
+      requestAnimationFrame(() => { scrollWrap.scrollLeft = scrollWrap.scrollWidth; });
+    }
+
+    drawChart(0);
+    sel.onchange = () => drawChart(parseInt(sel.value));
   }
 
-  drawChart(0);
-  sel.onchange = () => drawChart(parseInt(sel.value));
+  // ── PR TAB ──
+  function drawPRTab() {
+    const allExercises = [];
+    state.days.forEach((day, di) => {
+      day.exercises.forEach((ex, ei) => {
+        allExercises.push({ name: ex.name, di, ei });
+      });
+    });
+
+    if (allExercises.length === 0) {
+      contentWrap.innerHTML = `<div style="padding:24px;text-align:center;color:var(--text-muted);font-size:13px">${t('noDataYet')}</div>`;
+      return;
+    }
+
+    const list = document.createElement('div');
+    list.style.cssText = 'padding:12px 16px;display:flex;flex-direction:column;gap:8px;';
+
+    // Önce tüm PR değerlerini hesapla
+    const exWithPR = allExercises.map(ex => {
+      let prKg = 0, prWeek = '';
+      const sortedKeys = Object.keys(history).sort();
+      sortedKeys.forEach(key => {
+        const hw = history[key];
+        if (!hw.sets) return;
+        const dayEx = hw.days?.[ex.di]?.exercises?.[ex.ei];
+        const exSets = dayEx?.sets || state.days[ex.di].exercises[ex.ei]?.sets || 3;
+        for (let s = 0; s < exSets; s++) {
+          const sd = hw.sets[`${ex.di}-${ex.ei}-${s}`];
+          if (sd?.done && sd.kg) {
+            const kg = parseFloat(sd.kg) || 0;
+            if (kg > prKg) { prKg = kg; prWeek = weekLabel(key); }
+          }
+        }
+      });
+      const curEx = state.days[ex.di].exercises[ex.ei];
+      if (curEx) {
+        for (let s = 0; s < curEx.sets; s++) {
+          const sd = sessionSets[`${ex.di}-${ex.ei}-${s}`];
+          if (sd?.done && sd.kg) {
+            const kg = parseFloat(sd.kg) || 0;
+            if (kg > prKg) { prKg = kg; prWeek = t('now'); }
+          }
+        }
+      }
+      return { ...ex, prKg, prWeek };
+    });
+
+    // En yüksek PR üste gelsin, PR'sız olanlar en alta
+    exWithPR.sort((a, b) => b.prKg - a.prKg);
+
+    exWithPR.forEach(({ name, prKg, prWeek }) => {
+      const row = document.createElement('div');
+      row.style.cssText = `display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--surface2);border-radius:12px;gap:12px;`;
+
+      const left = document.createElement('div');
+      left.style.cssText = 'display:flex;align-items:center;gap:10px;min-width:0;';
+      const trophy = document.createElement('span');
+      trophy.textContent = '🏆';
+      trophy.style.fontSize = '16px';
+      const nameEl = document.createElement('div');
+      nameEl.style.cssText = 'font-size:13px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+      nameEl.textContent = name;
+      left.appendChild(trophy);
+      left.appendChild(nameEl);
+
+      const right = document.createElement('div');
+      right.style.cssText = 'text-align:right;flex-shrink:0;';
+      if (prKg > 0) {
+        const kg = document.createElement('div');
+        kg.style.cssText = 'font-size:15px;font-weight:700;color:var(--accent);';
+        kg.textContent = prKg + ' ' + weightUnit;
+        const week = document.createElement('div');
+        week.style.cssText = 'font-size:11px;color:var(--text-muted);margin-top:2px;';
+        week.textContent = prWeek;
+        right.appendChild(kg);
+        right.appendChild(week);
+      } else {
+        right.innerHTML = `<span style="font-size:12px;color:var(--text-muted)">${t('noDataYet')}</span>`;
+      }
+
+      row.appendChild(left);
+      row.appendChild(right);
+      list.appendChild(row);
+    });
+
+    contentWrap.appendChild(list);
+  }
+
+  drawChartTab();
 }
 
 // ── WEIGHT PANEL ──
@@ -1916,20 +2044,34 @@ function render() {
   updateMainScroll();
 }
 
+// ── SCROLL LOCK ──
+let _scrollLocked = false;
+function _preventScroll(e) {
+  // Allow scrolling inside sidebar, modals, settings
+  const allowed = e.target.closest('.sidebar-body, .modal, .settings-sheet, .sidebar');
+  if (!allowed) e.preventDefault();
+}
+function lockScroll() {
+  if (_scrollLocked) return;
+  _scrollLocked = true;
+  document.addEventListener('touchmove', _preventScroll, { passive: false });
+}
+function unlockScroll() {
+  if (!_scrollLocked) return;
+  _scrollLocked = false;
+  document.removeEventListener('touchmove', _preventScroll);
+}
+
 function updateMainScroll() {
-  // Only apply on mobile
   if (window.innerWidth > 600) return;
-  // Don't lock if a panel/modal is open
   if (activePanel) return;
   const exercises = (viewingWeek
     ? (history[viewingWeek] || state).days[activeDay].exercises
     : state.days[activeDay].exercises) || [];
-  const main = document.querySelector('.main');
-  if (!main) return;
   if (exercises.length === 0) {
-    main.style.overflowY = 'hidden';
+    lockScroll();
   } else {
-    main.style.overflowY = '';
+    unlockScroll();
   }
 }
 
@@ -2455,6 +2597,7 @@ function openAddExerciseModal() {
   libraryActiveGroup = null;
   renderLibrary();
   document.getElementById('addExerciseOverlay').classList.add('open');
+  unlockScroll();
   document.body.style.overflow = 'hidden';
   initModalSwipe();
 }
@@ -2463,6 +2606,7 @@ function closeAddExerciseModal() {
   if (modal) modal._swipeInit = false;
   document.getElementById('addExerciseOverlay').classList.remove('open');
   document.body.style.overflow = '';
+  updateMainScroll();
 }
 
 function initModalSwipe() {
@@ -2555,6 +2699,7 @@ let weightUnit = 'kg';
 
 function openSettings() {
   document.getElementById('settingsOverlay').classList.add('open');
+  unlockScroll();
   document.body.style.overflow = 'hidden';
   renderAccentSwatches();
   initSettingsSwipe();
@@ -2562,6 +2707,7 @@ function openSettings() {
 function closeSettings() {
   document.getElementById('settingsOverlay').classList.remove('open');
   document.body.style.overflow = '';
+  updateMainScroll();
 }
 
 function initSettingsSwipe() {
