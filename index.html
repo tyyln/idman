@@ -1098,6 +1098,7 @@
 <!-- Add Exercise Modal -->
 <div class="overlay" id="addExerciseOverlay">
   <div class="modal">
+    <div class="settings-sheet-handle" style="margin-bottom:16px"></div>
     <h2 data-i18n="addExerciseTitle"></h2>
     <div class="modal-field">
       <label data-i18n="exerciseName"></label>
@@ -2437,10 +2438,49 @@ function openAddExerciseModal() {
   renderLibrary();
   document.getElementById('addExerciseOverlay').classList.add('open');
   document.body.style.overflow = 'hidden';
+  initModalSwipe();
 }
 function closeAddExerciseModal() {
+  const modal = document.querySelector('#addExerciseOverlay .modal');
+  if (modal) modal._swipeInit = false;
   document.getElementById('addExerciseOverlay').classList.remove('open');
   document.body.style.overflow = '';
+}
+
+function initModalSwipe() {
+  const modal = document.querySelector('#addExerciseOverlay .modal');
+  if (!modal || modal._swipeInit) return;
+  modal._swipeInit = true;
+  let startY = 0, currentY = 0, dragging = false;
+
+  function onStart(e) {
+    const touch = e.touches ? e.touches[0] : e;
+    startY = touch.clientY;
+    currentY = 0;
+    dragging = true;
+    modal.style.transition = 'none';
+  }
+  function onMove(e) {
+    if (!dragging) return;
+    const touch = e.touches ? e.touches[0] : e;
+    currentY = touch.clientY - startY;
+    if (currentY < 0) currentY = 0;
+    modal.style.transform = `translateY(${currentY}px)`;
+  }
+  function onEnd() {
+    if (!dragging) return;
+    dragging = false;
+    modal.style.transition = '';
+    if (currentY > 100) {
+      modal.style.transform = '';
+      closeAddExerciseModal();
+    } else {
+      modal.style.transform = 'translateY(0)';
+    }
+  }
+  modal.addEventListener('touchstart', onStart, { passive: true });
+  modal.addEventListener('touchmove', onMove, { passive: false });
+  modal.addEventListener('touchend', onEnd);
 }
 function addExercise() {
   const name = document.getElementById('newExName').value.trim();
@@ -2570,7 +2610,7 @@ function initSidebarSwipe() {
       sidebar.style.transform = '';
       closeSidebar();
     } else {
-      sidebar.style.transform = '';
+      sidebar.style.transform = 'translateY(0)';
     }
   }
   sidebar.addEventListener('touchstart', onStart, { passive: true });
@@ -2934,18 +2974,20 @@ if ('serviceWorker' in navigator) {
     top: auto !important;
     bottom: 0 !important;
     width: 100% !important;
-    height: 0 !important;
+    height: calc(100vh - 64px - env(safe-area-inset-bottom)) !important;
     max-height: calc(100vh - 64px - env(safe-area-inset-bottom)) !important;
     border-right: none !important;
     border-top: 1px solid var(--border-light) !important;
     border-radius: 20px 20px 0 0 !important;
-    transition: height 0.35s cubic-bezier(0.4,0,0.2,1) !important;
+    transform: translateY(100%) !important;
+    transition: transform 0.35s cubic-bezier(0.4,0,0.2,1) !important;
+    will-change: transform !important;
     box-shadow: none !important;
     z-index: 20 !important;
+    overflow: hidden !important;
   }
   .sidebar.open {
-    width: 100% !important;
-    height: calc(100vh - 64px - env(safe-area-inset-bottom)) !important;
+    transform: translateY(0) !important;
     box-shadow: 0 -8px 32px rgba(0,0,0,0.18) !important;
   }
   [data-theme="dark"] .sidebar.open {
