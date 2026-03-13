@@ -2895,12 +2895,14 @@ if ('serviceWorker' in navigator) {
     box-shadow: 0 -8px 32px rgba(0,0,0,0.5) !important;
   }
 
+  body { overscroll-behavior-y: none !important; }
   .main {
     padding: 20px 16px calc(72px + env(safe-area-inset-bottom)) !important;
     max-width: 100% !important;
     width: 100% !important;
     box-sizing: border-box !important;
     margin: 0 !important;
+    overscroll-behavior-y: none !important;
   }
 
   .header h1 { font-size: 20px !important; }
