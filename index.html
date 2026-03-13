@@ -2012,8 +2012,36 @@ function initDragDrop(cardEl, ei) {
     render();
   });
 
-  // Touch drag (mobile) — long press to activate
+  // Touch drag (mobile) — long press to activate, card follows finger
   let touchStartY = 0, touchStartX = 0, touchSrcIdx = null, longPressTimer = null, dragActive = false;
+  let ghost = null, placeholder = null;
+
+  function createGhost() {
+    const rect = cardEl.getBoundingClientRect();
+    ghost = cardEl.cloneNode(true);
+    ghost.style.cssText = `position:fixed;left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;opacity:0.85;pointer-events:none;z-index:9999;box-shadow:0 8px 32px rgba(0,0,0,0.25);transform:scale(1.03);transition:none;border-radius:var(--radius);`;
+    document.body.appendChild(ghost);
+    placeholder = document.createElement('div');
+    placeholder.style.cssText = `height:${rect.height}px;margin-bottom:10px;border-radius:var(--radius);background:var(--surface2);border:2px dashed var(--accent);box-sizing:border-box;`;
+    cardEl.parentNode.insertBefore(placeholder, cardEl);
+    cardEl.style.opacity = '0';
+  }
+
+  function removeGhost() {
+    if (ghost) { ghost.remove(); ghost = null; }
+    if (placeholder) { placeholder.remove(); placeholder = null; }
+    cardEl.style.opacity = '';
+    cardEl.style.transform = '';
+  }
+
+  function getCardAtY(y) {
+    const cards = [...document.querySelectorAll('.workout-card')].filter(c => c !== cardEl);
+    for (const c of cards) {
+      const r = c.getBoundingClientRect();
+      if (y >= r.top && y <= r.bottom) return c;
+    }
+    return null;
+  }
 
   cardEl.addEventListener('touchstart', e => {
     touchStartY = e.touches[0].clientY;
@@ -2022,42 +2050,64 @@ function initDragDrop(cardEl, ei) {
     dragActive = false;
     longPressTimer = setTimeout(() => {
       dragActive = true;
-      cardEl.style.opacity = '0.5';
-      cardEl.style.transform = 'scale(1.02)';
+      createGhost();
     }, 500);
   }, { passive: true });
 
   cardEl.addEventListener('touchmove', e => {
     const dy = Math.abs(e.touches[0].clientY - touchStartY);
     const dx = Math.abs(e.touches[0].clientX - touchStartX);
-    // Parmak hareket ederse long press iptal
-    if (dy > 8 || dx > 8) {
-      clearTimeout(longPressTimer);
-      longPressTimer = null;
-      if (!dragActive) touchSrcIdx = null;
+    if (!dragActive) {
+      if (dy > 8 || dx > 8) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+        touchSrcIdx = null;
+      }
+      return;
     }
-  }, { passive: true });
+    e.preventDefault();
+    const touch = e.touches[0];
+    const rect = ghost.getBoundingClientRect();
+    ghost.style.top = (touch.clientY - rect.height / 2) + 'px';
+
+    // Move placeholder to indicate drop position
+    const target = getCardAtY(touch.clientY);
+    if (target && target !== placeholder) {
+      const targetRect = target.getBoundingClientRect();
+      if (touch.clientY < targetRect.top + targetRect.height / 2) {
+        target.parentNode.insertBefore(placeholder, target);
+      } else {
+        target.parentNode.insertBefore(placeholder, target.nextSibling);
+      }
+    }
+  }, { passive: false });
 
   cardEl.addEventListener('touchend', e => {
     clearTimeout(longPressTimer);
     longPressTimer = null;
-    cardEl.style.opacity = '';
-    cardEl.style.transform = '';
-    if (!dragActive || touchSrcIdx === null) { dragActive = false; touchSrcIdx = null; return; }
-    const endY = e.changedTouches[0].clientY;
-    const diff = endY - touchStartY;
-    if (Math.abs(diff) < 30) { dragActive = false; touchSrcIdx = null; return; }
-    const exs = state.days[activeDay].exercises;
-    const dir = diff > 0 ? 1 : -1;
-    const newIdx = Math.max(0, Math.min(exs.length - 1, touchSrcIdx + dir));
-    if (newIdx !== touchSrcIdx) {
-      const [moved] = exs.splice(touchSrcIdx, 1);
-      exs.splice(newIdx, 0, moved);
-      saveState();
-      render();
+    if (!dragActive || touchSrcIdx === null) {
+      removeGhost();
+      dragActive = false; touchSrcIdx = null; return;
     }
-    dragActive = false;
-    touchSrcIdx = null;
+    // Find new index from placeholder position
+    if (placeholder) {
+      const allCards = [...document.querySelectorAll('.workout-card')];
+      const siblings = [...placeholder.parentNode.children];
+      let newIdx = 0, count = 0;
+      for (const el of siblings) {
+        if (el === placeholder) { newIdx = count; break; }
+        if (allCards.includes(el) && el !== cardEl) count++;
+      }
+      const exs = state.days[activeDay].exercises;
+      if (newIdx !== touchSrcIdx) {
+        const [moved] = exs.splice(touchSrcIdx, 1);
+        exs.splice(newIdx, 0, moved);
+        saveState();
+      }
+    }
+    removeGhost();
+    dragActive = false; touchSrcIdx = null;
+    render();
   }, { passive: true });
 }
 
