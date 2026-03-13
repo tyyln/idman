@@ -2478,11 +2478,13 @@ let weightUnit = 'kg';
 
 function openSettings() {
   document.getElementById('settingsOverlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
   renderAccentSwatches();
   initSettingsSwipe();
 }
 function closeSettings() {
   document.getElementById('settingsOverlay').classList.remove('open');
+  document.body.style.overflow = '';
 }
 
 function initSettingsSwipe() {
