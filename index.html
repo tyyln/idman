@@ -782,7 +782,7 @@
     border-radius: 10px;
     border: none;
     background: transparent;
-    color: var(--text-secondary);
+    color: var(--nav-icon-color);
     cursor: pointer;
     display: flex; align-items: center; justify-content: center;
     transition: background 0.15s, color 0.15s;
@@ -2479,9 +2479,46 @@ let weightUnit = 'kg';
 function openSettings() {
   document.getElementById('settingsOverlay').classList.add('open');
   renderAccentSwatches();
+  initSettingsSwipe();
 }
 function closeSettings() {
   document.getElementById('settingsOverlay').classList.remove('open');
+}
+
+function initSettingsSwipe() {
+  const sheet = document.querySelector('.settings-sheet');
+  if (!sheet || sheet._swipeInit) return;
+  sheet._swipeInit = true;
+  let startY = 0, currentY = 0, dragging = false;
+
+  function onStart(e) {
+    const touch = e.touches ? e.touches[0] : e;
+    startY = touch.clientY;
+    currentY = 0;
+    dragging = true;
+    sheet.style.transition = 'none';
+  }
+  function onMove(e) {
+    if (!dragging) return;
+    const touch = e.touches ? e.touches[0] : e;
+    currentY = touch.clientY - startY;
+    if (currentY < 0) currentY = 0;
+    sheet.style.transform = `translateY(${currentY}px)`;
+  }
+  function onEnd() {
+    if (!dragging) return;
+    dragging = false;
+    sheet.style.transition = '';
+    if (currentY > 100) {
+      sheet.style.transform = '';
+      closeSettings();
+    } else {
+      sheet.style.transform = '';
+    }
+  }
+  sheet.addEventListener('touchstart', onStart, { passive: true });
+  sheet.addEventListener('touchmove', onMove, { passive: true });
+  sheet.addEventListener('touchend', onEnd);
 }
 
 function setWeightUnit(unit) {
