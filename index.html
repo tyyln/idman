@@ -1913,6 +1913,24 @@ function render() {
   const isReadonly = viewingWeek !== null;
   document.getElementById('readonlyBanner').style.display = isReadonly ? '' : 'none';
   updateTimerBar();
+  updateMainScroll();
+}
+
+function updateMainScroll() {
+  // Only apply on mobile
+  if (window.innerWidth > 600) return;
+  // Don't lock if a panel/modal is open
+  if (activePanel) return;
+  const exercises = (viewingWeek
+    ? (history[viewingWeek] || state).days[activeDay].exercises
+    : state.days[activeDay].exercises) || [];
+  const main = document.querySelector('.main');
+  if (!main) return;
+  if (exercises.length === 0) {
+    main.style.overflowY = 'hidden';
+  } else {
+    main.style.overflowY = '';
+  }
 }
 
 function updateTimerBar() {
@@ -2880,7 +2898,7 @@ const ACCENT_COLORS = [
   { id: 'green',   light: '#34C759', dark: '#30d158', name: 'Yeşil' },
   { id: 'red',     light: '#FF3B30', dark: '#ff453a', name: 'Kırmızı' },
   { id: 'orange',  light: '#FF9500', dark: '#ff9f0a', name: 'Turuncu' },
-  { id: 'purple',  light: '#B5197A', dark: '#d4208f', name: 'Mor' },
+  { id: 'purple',  light: '#E91E8C', dark: '#FF2D9B', name: 'Mor' },
   { id: 'pink',    light: '#FF2D55', dark: '#ff375f', name: 'Pembe' },
   { id: 'teal',    light: '#00C7BE', dark: '#63e6e2', name: 'Teal' },
   { id: 'yellow',  light: '#FFD60A', dark: '#ffd60a', name: 'Sarı' },
