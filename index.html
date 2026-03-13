@@ -1006,6 +1006,21 @@
       </div>
       <div id="accentSwatches" style="display:grid;grid-template-columns:repeat(4,32px);gap:10px;margin:0 auto;align-self:center"></div>
     </div>
+    <div class="settings-row" style="justify-content:space-between">
+      <div>
+        <div class="settings-row-label" data-i18n="backupLabel"></div>
+        <div class="settings-row-sub" data-i18n="backupSub"></div>
+      </div>
+      <button onclick="exportData()" style="padding:8px 14px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap" data-i18n="backupExport"></button>
+    </div>
+    <div class="settings-row" style="justify-content:space-between">
+      <div>
+        <div class="settings-row-label" data-i18n="restoreLabel"></div>
+        <div class="settings-row-sub" data-i18n="restoreSub"></div>
+      </div>
+      <button onclick="document.getElementById('importInput').click()" style="padding:8px 14px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap" data-i18n="backupImport"></button>
+      <input type="file" id="importInput" accept=".json" style="display:none" onchange="importData(event)">
+    </div>
   </div>
 </div>
 
@@ -1168,6 +1183,14 @@ const I18N = {
     language: 'Dil',
     languageSub: 'Uygulama dilini değiştir',
     accentColor: 'Renk Teması',
+    backupLabel: 'Veriyi Yedekle',
+    backupSub: 'Tüm antrenman geçmişini JSON olarak indir',
+    backupExport: 'İndir',
+    restoreLabel: 'Veriyi Geri Yükle',
+    restoreSub: 'Daha önce yedeklenen JSON dosyasını yükle',
+    backupImport: 'Yükle',
+    restoreSuccess: 'Veriler başarıyla geri yüklendi.',
+    restoreError: 'Geçersiz yedek dosyası.',
     accentColorSub: 'Uygulama accent rengini seç',
     themeLabel: 'Görünüm',
     themeSub: 'Açık veya koyu mod',
@@ -1245,6 +1268,14 @@ const I18N = {
     language: 'Language',
     languageSub: 'Change app language',
     accentColor: 'Color Theme',
+    backupLabel: 'Backup Data',
+    backupSub: 'Download all workout history as JSON',
+    backupExport: 'Download',
+    restoreLabel: 'Restore Data',
+    restoreSub: 'Load a previously backed up JSON file',
+    backupImport: 'Import',
+    restoreSuccess: 'Data restored successfully.',
+    restoreError: 'Invalid backup file.',
     accentColorSub: 'Choose the app accent color',
     themeLabel: 'Appearance',
     themeSub: 'Light or dark mode',
@@ -3179,6 +3210,53 @@ function renderAccentSwatches() {
     applyAccent(accentId);
   } catch(e) { applyAccent('blue'); }
 })();
+
+function exportData() {
+  const backup = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    state: state,
+    history: history,
+    sessionSets: sessionSets,
+    weightLog: loadWeightLog(),
+  };
+  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `antrenman-yedek-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const backup = JSON.parse(e.target.result);
+      if (!backup.state || !backup.history) throw new Error('invalid');
+      // Restore all data
+      state = backup.state;
+      history = backup.history;
+      sessionSets = backup.sessionSets || {};
+      if (backup.weightLog) {
+        try { localStorage.setItem(WEIGHT_KEY, JSON.stringify(backup.weightLog)); } catch(err) {}
+      }
+      saveState();
+      try { localStorage.setItem(HISTORY_KEY, JSON.stringify(history)); } catch(err) {}
+      saveSession();
+      flash(t('restoreSuccess'));
+      render();
+      closeSettings();
+    } catch(err) {
+      flash(t('restoreError'));
+    }
+    event.target.value = '';
+  };
+  reader.readAsText(file);
+}
 
 function toggleTheme() {
   const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
