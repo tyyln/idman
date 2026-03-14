@@ -3639,12 +3639,18 @@ function renderAccentSwatches() {
 
 function exportData() {
   const backup = {
-    version: 1,
+    version: 2,
     exportedAt: new Date().toISOString(),
     state: state,
     history: history,
     sessionSets: { ...sessionSets, _weekKey: getCurrentWeekKey() },
     weightLog: loadWeightLog(),
+    settings: {
+      theme: localStorage.getItem('antrenman_theme') || 'light',
+      lang: localStorage.getItem('antrenman_lang') || 'en',
+      unit: localStorage.getItem('antrenman_unit') || 'kg',
+      accent: localStorage.getItem('antrenman_accent') || 'blue',
+    },
   };
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -3679,6 +3685,15 @@ function importData(event) {
 
       if (backup.weightLog) {
         try { localStorage.setItem(WEIGHT_KEY, JSON.stringify(backup.weightLog)); } catch(err) {}
+      }
+
+      // Ayarları geri yükle
+      if (backup.settings) {
+        const s = backup.settings;
+        if (s.theme) { applyTheme(s.theme === 'dark'); }
+        if (s.lang) { lang = s.lang; try { localStorage.setItem('antrenman_lang', lang); } catch(e) {} }
+        if (s.unit) { weightUnit = s.unit; try { localStorage.setItem('antrenman_unit', weightUnit); } catch(e) {} }
+        if (s.accent) { accentId = s.accent; applyAccent(accentId); }
       }
 
       // activeDay'i bugüne ayarla
