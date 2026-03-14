@@ -1750,6 +1750,7 @@ function calcStreak() {
 function renderProgressPanel() {
   const body = document.getElementById('sidebarBody');
   body.innerHTML = '';
+  body._tabSwipeInit = false;
 
   // ── STREAK KARTI ──
   const { current, best } = calcStreak();
@@ -2061,6 +2062,7 @@ function saveBioLog(log) {
 function renderWeightPanel() {
   const body = document.getElementById('sidebarBody');
   body.innerHTML = '';
+  body._tabSwipeInit = false;
 
   // ── BMI KARTI ──
   const bioLog = loadBioLog();
@@ -3741,20 +3743,23 @@ function closeSettings() {
 }
 
 function initTabSwipe(contentEl, tabBar) {
-  if (!contentEl || contentEl._tabSwipeInit) return;
-  contentEl._tabSwipeInit = true;
-  let startX = 0, startY = 0;
+  // contentEl yerine sidebarBody'ye bağla — daha geniş alan
+  const sidebarBody = document.getElementById('sidebarBody');
+  if (!sidebarBody || sidebarBody._tabSwipeInit) return;
+  sidebarBody._tabSwipeInit = true;
+  let startX = 0, startY = 0, moved = false;
 
-  contentEl.addEventListener('touchstart', e => {
+  sidebarBody.addEventListener('touchstart', e => {
     startX = e.touches[0].clientX;
     startY = e.touches[0].clientY;
+    moved = false;
   }, { passive: true });
 
-  contentEl.addEventListener('touchend', e => {
+  sidebarBody.addEventListener('touchend', e => {
     const dx = e.changedTouches[0].clientX - startX;
     const dy = Math.abs(e.changedTouches[0].clientY - startY);
-    // Yatay swipe — dikey kaydırma değilse
-    if (Math.abs(dx) < 50 || dy > 40) return;
+    // Yatay swipe: en az 60px yatay, dikey hareketten fazla
+    if (Math.abs(dx) < 60 || dy > Math.abs(dx)) return;
     const tabs = [...tabBar.querySelectorAll('button[data-tab]')];
     const activeIdx = tabs.findIndex(b => b.style.color === 'var(--accent)');
     if (dx < 0 && activeIdx < tabs.length - 1) tabs[activeIdx + 1].click();
@@ -3800,12 +3805,19 @@ function initSettingsSwipe() {
 
 function initSidebarSwipe() {
   const sidebar = document.getElementById('sidebar');
+  const handle = sidebar?.querySelector('.sidebar-handle-bar');
+  const header = sidebar?.querySelector('.sidebar-header');
   if (!sidebar || sidebar._swipeInit) return;
   sidebar._swipeInit = true;
   let startY = 0, currentY = 0, dragging = false;
 
   function onStart(e) {
-    const touch = e.touches ? e.touches[0] : e;
+    // Sadece handle veya header'dan başlayan swipe'ları yakala
+    const touch = e.touches[0];
+    const target = e.target;
+    const isFromHandle = handle && handle.contains(target);
+    const isFromHeader = header && header.contains(target);
+    if (!isFromHandle && !isFromHeader) return;
     startY = touch.clientY;
     currentY = 0;
     dragging = true;
@@ -3813,16 +3825,17 @@ function initSidebarSwipe() {
   }
   function onMove(e) {
     if (!dragging) return;
-    const touch = e.touches ? e.touches[0] : e;
+    const touch = e.touches[0];
     currentY = touch.clientY - startY;
     if (currentY < 0) currentY = 0;
+    if (currentY > 0) e.preventDefault();
     sidebar.style.transform = `translateY(${currentY}px)`;
   }
   function onEnd() {
     if (!dragging) return;
     dragging = false;
     sidebar.style.transition = '';
-    if (currentY > 100) {
+    if (currentY > 80) {
       sidebar.style.transform = '';
       closeSidebar();
     } else {
