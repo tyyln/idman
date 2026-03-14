@@ -1461,25 +1461,20 @@ function loadSession() {
     const saved = localStorage.getItem(SESSION_KEY);
     if (saved) {
       const { weekKey, sets } = JSON.parse(saved);
-      if (weekKey === getCurrentWeekKey()) {
-        sets._savedWeekKey = weekKey;
-        return sets;
-      }
+      if (weekKey === getCurrentWeekKey()) return sets;
     }
   } catch(e) {}
-  const empty = {};
-  empty._savedWeekKey = getCurrentWeekKey();
-  return empty;
+  return {};
 }
 function saveSession() {
   try {
-    sessionSets._savedWeekKey = getCurrentWeekKey();
     const { _savedWeekKey, ...setsToSave } = sessionSets;
     localStorage.setItem(SESSION_KEY, JSON.stringify({ weekKey: getCurrentWeekKey(), sets: setsToSave }));
   } catch(e) {}
 }
 
 let sessionSets = loadSession();
+let _sessionWeekKey = getCurrentWeekKey();
 
 // viewingWeek: null = bu hafta (live), string = geçmiş hafta key (readonly)
 let viewingWeek = null;
@@ -1576,15 +1571,14 @@ function saveHistory() {
 
 // Save current week session when switching or closing
 function saveCurrentWeekToHistory() {
-  const doneSets = Object.entries(sessionSets).filter(([k, s]) => k !== '_savedWeekKey' && s?.done);
+  const doneSets = Object.entries(sessionSets).filter(([k, s]) => s?.done);
   if (doneSets.length === 0) return;
   const weekKey = getCurrentWeekKey();
   if (!history[weekKey]) {
     history[weekKey] = { sets: {}, days: JSON.parse(JSON.stringify(state.days)) };
   }
-  // _savedWeekKey hariç merge et
   Object.entries(sessionSets).forEach(([k, v]) => {
-    if (k !== '_savedWeekKey') history[weekKey].sets[k] = v;
+    history[weekKey].sets[k] = v;
   });
 
   // Keep lastKg/lastReps up to date in state for next week's placeholders
@@ -1910,23 +1904,29 @@ function renderProgressPanel() {
         const hw = history[key];
         if (!hw.sets) return;
         let maxKg = 0;
-        const dayEx = hw.days?.[ex.di]?.exercises?.[ex.ei];
-        const exSets = dayEx?.sets || state.days[ex.di].exercises[ex.ei]?.sets || 3;
-        for (let s = 0; s < exSets; s++) {
-          const sd = hw.sets[`${ex.di}-${ex.ei}-${s}`];
-          if (sd?.done && sd.kg) maxKg = Math.max(maxKg, parseFloat(sd.kg) || 0);
-        }
+        // İsme göre egzersizi bul
+        hw.days?.forEach((day, di) => {
+          day.exercises?.forEach((hEx, ei) => {
+            if (hEx.name !== ex.name) return;
+            for (let s = 0; s < hEx.sets; s++) {
+              const sd = hw.sets[`${di}-${ei}-${s}`];
+              if (sd?.done && sd.kg) maxKg = Math.max(maxKg, parseFloat(sd.kg) || 0);
+            }
+          });
+        });
         if (maxKg > 0) dataPoints.push({ label: weekLabel(key), kg: maxKg });
       });
-      // Mevcut hafta — sessionSets'ten al, en sona ekle
+      // Mevcut hafta — sessionSets'ten al
       let curMax = 0;
-      const curEx = state.days[ex.di].exercises[ex.ei];
-      if (curEx) {
-        for (let s = 0; s < curEx.sets; s++) {
-          const sd = sessionSets[`${ex.di}-${ex.ei}-${s}`];
-          if (sd?.done && sd.kg) curMax = Math.max(curMax, parseFloat(sd.kg) || 0);
-        }
-      }
+      state.days.forEach((day, di) => {
+        day.exercises.forEach((sEx, ei) => {
+          if (sEx.name !== ex.name) return;
+          for (let s = 0; s < sEx.sets; s++) {
+            const sd = sessionSets[`${di}-${ei}-${s}`];
+            if (sd?.done && sd.kg) curMax = Math.max(curMax, parseFloat(sd.kg) || 0);
+          }
+        });
+      });
       if (curMax > 0) dataPoints.push({ label: weekLabel(getCurrentWeekKey()) + ' (' + t('now') + ')', kg: curMax });
 
       if (dataPoints.length === 0) {
@@ -2808,9 +2808,12 @@ function initDragDrop(cardEl, ei) {
 function render() {
   // Hafta değişmişse session'ı temizle
   const currentKey = getCurrentWeekKey();
-  if (sessionSets._savedWeekKey && sessionSets._savedWeekKey !== currentKey) {
+  if (currentKey !== _sessionWeekKey) {
+    saveCurrentWeekToHistory();
     sessionSets = {};
+    _sessionWeekKey = currentKey;
     saveSession();
+    carryOverLastWeek();
   }
   renderTabs();
   renderContent();
