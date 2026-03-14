@@ -1475,6 +1475,19 @@ function saveSession() {
 
 let sessionSets = loadSession();
 let _sessionWeekKey = getCurrentWeekKey();
+// Startup'ta da hafta kontrolü — eski session varsa temizle
+if (Object.keys(sessionSets).length > 0) {
+  const savedData = localStorage.getItem('antrenman_session_v1');
+  if (savedData) {
+    try {
+      const { weekKey } = JSON.parse(savedData);
+      if (weekKey !== _sessionWeekKey) {
+        sessionSets = {};
+        saveSession();
+      }
+    } catch(e) { sessionSets = {}; }
+  }
+}
 
 // viewingWeek: null = bu hafta (live), string = geçmiş hafta key (readonly)
 let viewingWeek = null;
@@ -1529,7 +1542,9 @@ function weekLabel(key) {
   const monthsEN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const months = lang === 'en' ? monthsEN : monthsTR;
   const fmt = (d) => `${d.getDate()} ${months[d.getMonth()]}`;
-  return `${fmt(start)} – ${fmt(end)}`;
+  const currentYear = new Date().getFullYear();
+  const yearSuffix = start.getFullYear() !== currentYear ? ` ${start.getFullYear()}` : '';
+  return `${fmt(start)}${yearSuffix} – ${fmt(end)}${yearSuffix}`;
 }
 
 function getDayName(day, i) {
@@ -1935,7 +1950,7 @@ function renderProgressPanel() {
       }
 
       const maxVal = Math.max(...dataPoints.map(d => d.kg));
-      const minVal = Math.min(...dataPoints.map(d => d.kg));
+      const minVal = 0; // Her zaman 0'dan başlat
       const range = maxVal - minVal || 1;
       const BAR_W = 36, BAR_GAP = 16, H = 180, pad = 24;
       const W = Math.max(300, dataPoints.length * (BAR_W + BAR_GAP) + pad * 2);
@@ -1951,7 +1966,7 @@ function renderProgressPanel() {
 
       dataPoints.forEach((d, i) => {
         const x = pad + i * (BAR_W + BAR_GAP);
-        const barH = Math.max(8, ((d.kg - minVal) / range) * (H - 20) + 20);
+        const barH = Math.max(8, (d.kg / range) * (H - 20) + 20);
         const y = H - barH;
         const isLast = i === dataPoints.length - 1;
         const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
@@ -1961,33 +1976,28 @@ function renderProgressPanel() {
         rect.setAttribute('fill', isLast ? 'var(--accent)' : 'var(--surface2)');
         svg.appendChild(rect);
 
+        // Değer etiketi — bar içinde veya üstünde
         const val = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        val.setAttribute('x', x + BAR_W / 2); val.setAttribute('y', y - 5);
+        val.setAttribute('x', x + BAR_W / 2);
+        val.setAttribute('y', y > 12 ? y - 4 : y + 12);
         val.setAttribute('text-anchor', 'middle');
-        val.setAttribute('font-size', '10'); val.setAttribute('fill', 'var(--text-secondary)');
+        val.setAttribute('font-size', '9');
+        val.setAttribute('fill', y > 12 ? 'var(--text-secondary)' : '#fff');
         val.textContent = displayWeight(d.kg) + weightUnit;
         svg.appendChild(val);
 
+        // Tarih etiketi — döndürülmüş
         const lbl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        lbl.setAttribute('x', x + BAR_W / 2); lbl.setAttribute('y', H + 14);
-        lbl.setAttribute('text-anchor', 'middle');
-        lbl.setAttribute('font-size', '8'); lbl.setAttribute('fill', 'var(--text-muted)');
-        // "9 - 15 Mar (Now)" gibi uzun etiketleri iki satıra böl
+        const lx = x + BAR_W / 2;
+        const ly = H + 12;
+        lbl.setAttribute('x', lx);
+        lbl.setAttribute('y', ly);
+        lbl.setAttribute('text-anchor', 'end');
+        lbl.setAttribute('font-size', '8');
+        lbl.setAttribute('fill', 'var(--text-muted)');
+        lbl.setAttribute('transform', `rotate(-40, ${lx}, ${ly})`);
         if (d.label.includes('(')) {
-          const parts = d.label.split('(');
-          const tspan1 = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
-          tspan1.setAttribute('x', x + BAR_W / 2); tspan1.setAttribute('dy', '0');
-          tspan1.textContent = parts[0].trim();
-          const tspan2 = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
-          tspan2.setAttribute('x', x + BAR_W / 2); tspan2.setAttribute('dy', '10');
-          tspan2.setAttribute('font-weight', '600');
-          tspan2.setAttribute('fill', 'var(--accent)');
-          tspan2.textContent = '(' + parts[1];
-          lbl.appendChild(tspan1);
-          lbl.appendChild(tspan2);
-        } else {
-          lbl.textContent = d.label;
-        }
+          lbl.textContent = d.label.replace(/\s*\(.*\)/, '') + ' ★';
         svg.appendChild(lbl);
       });
       scrollWrap.appendChild(svg);
