@@ -1080,7 +1080,7 @@
 
   <!-- Content -->
   <div id="contentWrap">
-    <div id="content"></div>
+    <div id="content" style="min-height:80px;padding-bottom:40px;padding-top:16px"></div>
     <button class="add-btn" id="addExBtn" onclick="openEditDayModal()" style="opacity:0;filter:blur(8px);transition:opacity 0.4s ease,filter 0.4s ease;margin-top:0;">+ <span data-i18n="addExercise"></span></button>
   </div>
 </div>
@@ -1140,6 +1140,15 @@
       <label data-i18n="noteLabel"></label>
       <textarea id="newExNote" rows="2" data-i18n-placeholder="notePlaceholder" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:14px;font-family:inherit;resize:none;box-sizing:border-box;"></textarea>
     </div>
+    <div id="supersetRow" style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-top:1px solid var(--border-light);margin-top:4px">
+      <div>
+        <div style="font-size:13px;font-weight:600;color:var(--text)" data-i18n="supersetLabel"></div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:2px" data-i18n="supersetSub"></div>
+      </div>
+      <button id="supersetToggle" onclick="toggleSupersetNew()" style="width:44px;height:26px;border-radius:13px;border:none;background:var(--border);cursor:pointer;position:relative;transition:background 0.2s;flex-shrink:0">
+        <span id="supersetThumb" style="position:absolute;left:2px;top:2px;width:22px;height:22px;border-radius:50%;background:#fff;transition:left 0.2s;box-shadow:0 1px 4px rgba(0,0,0,0.2)"></span>
+      </button>
+    </div>
     <button class="btn-primary" onclick="addExercise()" data-i18n="add"></button>
     <button class="btn-cancel" onclick="closeAddExerciseModal()" data-i18n="cancel"></button>
   </div>
@@ -1191,6 +1200,9 @@ const I18N = {
     backupImport: 'Yükle',
     restoreSuccess: 'Veriler başarıyla geri yüklendi.',
     restoreError: 'Geçersiz yedek dosyası.',
+    supersetLabel: 'Superset',
+    supersetSub: 'Bir önceki egzersizle superset yap',
+    supersetDone: 'Superset tamamlandı! 🔥',
     accentColorSub: 'Uygulama accent rengini seç',
     themeLabel: 'Görünüm',
     themeSub: 'Açık veya koyu mod',
@@ -1276,6 +1288,9 @@ const I18N = {
     backupImport: 'Import',
     restoreSuccess: 'Data restored successfully.',
     restoreError: 'Invalid backup file.',
+    supersetLabel: 'Superset',
+    supersetSub: 'Pair with the previous exercise',
+    supersetDone: 'Superset complete! 🔥',
     accentColorSub: 'Choose the app accent color',
     themeLabel: 'Appearance',
     themeSub: 'Light or dark mode',
@@ -1707,7 +1722,8 @@ function renderProgressPanel() {
       chartWrap.innerHTML = '';
       const ex = exercises[exIdx];
       const dataPoints = [];
-      const sortedKeys = Object.keys(history).sort();
+      const currentKey = getCurrentWeekKey();
+      const sortedKeys = Object.keys(history).sort().filter(k => k !== currentKey);
       sortedKeys.forEach(key => {
         const hw = history[key];
         if (!hw.sets) return;
@@ -1720,6 +1736,7 @@ function renderProgressPanel() {
         }
         if (maxKg > 0) dataPoints.push({ label: weekLabel(key), kg: maxKg });
       });
+      // Mevcut hafta — sessionSets'ten al, en sona ekle
       let curMax = 0;
       const curEx = state.days[ex.di].exercises[ex.ei];
       if (curEx) {
@@ -1728,7 +1745,7 @@ function renderProgressPanel() {
           if (sd?.done && sd.kg) curMax = Math.max(curMax, parseFloat(sd.kg) || 0);
         }
       }
-      if (curMax > 0) dataPoints.push({ label: t('now'), kg: curMax });
+      if (curMax > 0) dataPoints.push({ label: weekLabel(getCurrentWeekKey()) + ' (' + t('now') + ')', kg: curMax });
 
       if (dataPoints.length === 0) {
         chartWrap.innerHTML = `<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:13px">${t('noDataYet')}</div>`;
@@ -1745,9 +1762,9 @@ function renderProgressPanel() {
       scrollWrap.style.cssText = 'overflow-x:auto;-webkit-overflow-scrolling:touch;margin-top:8px;padding-bottom:4px';
 
       const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-      svg.setAttribute('viewBox', `0 0 ${W} ${H + 40}`);
+      svg.setAttribute('viewBox', `0 0 ${W} ${H + 52}`);
       svg.setAttribute('width', W);
-      svg.setAttribute('height', H + 40);
+      svg.setAttribute('height', H + 52);
       svg.style.cssText = 'display:block;min-width:100%';
 
       dataPoints.forEach((d, i) => {
@@ -1770,10 +1787,25 @@ function renderProgressPanel() {
         svg.appendChild(val);
 
         const lbl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        lbl.setAttribute('x', x + BAR_W / 2); lbl.setAttribute('y', H + 16);
+        lbl.setAttribute('x', x + BAR_W / 2); lbl.setAttribute('y', H + 14);
         lbl.setAttribute('text-anchor', 'middle');
-        lbl.setAttribute('font-size', '9'); lbl.setAttribute('fill', 'var(--text-muted)');
-        lbl.textContent = d.label;
+        lbl.setAttribute('font-size', '8'); lbl.setAttribute('fill', 'var(--text-muted)');
+        // "9 - 15 Mar (Now)" gibi uzun etiketleri iki satıra böl
+        if (d.label.includes('(')) {
+          const parts = d.label.split('(');
+          const tspan1 = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
+          tspan1.setAttribute('x', x + BAR_W / 2); tspan1.setAttribute('dy', '0');
+          tspan1.textContent = parts[0].trim();
+          const tspan2 = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
+          tspan2.setAttribute('x', x + BAR_W / 2); tspan2.setAttribute('dy', '10');
+          tspan2.setAttribute('font-weight', '600');
+          tspan2.setAttribute('fill', 'var(--accent)');
+          tspan2.textContent = '(' + parts[1];
+          lbl.appendChild(tspan1);
+          lbl.appendChild(tspan2);
+        } else {
+          lbl.textContent = d.label;
+        }
         svg.appendChild(lbl);
       });
       scrollWrap.appendChild(svg);
@@ -2010,6 +2042,103 @@ function deleteWeightEntry(idx) {
 
 // ── DRAG & DROP (exercise reorder) ──
 let dragSrcIdx = null;
+let _isDragging = false;
+const openSetsState = new Set();
+
+// Sürükleme sırasında otomatik scroll
+let _autoScrollRAF = null;
+function startAutoScroll(clientY) {
+  const ZONE = 80, SPEED = 8;
+  const vh = window.innerHeight;
+  cancelAnimationFrame(_autoScrollRAF);
+  function step() {
+    if (clientY < ZONE) {
+      window.scrollBy(0, -SPEED);
+    } else if (clientY > vh - ZONE) {
+      window.scrollBy(0, SPEED);
+    }
+    _autoScrollRAF = requestAnimationFrame(step);
+  }
+  _autoScrollRAF = requestAnimationFrame(step);
+}
+function stopAutoScroll() {
+  cancelAnimationFrame(_autoScrollRAF);
+  _autoScrollRAF = null;
+}
+
+function saveOpenSets() {
+  openSetsState.clear();
+  document.querySelectorAll('.sets-container').forEach(el => {
+    if (el.classList.contains('open')) {
+      const idx = parseInt(el.id.replace('sets-', ''));
+      if (!isNaN(idx)) openSetsState.add(idx);
+    }
+  });
+}
+
+function restoreOpenSets() {
+  if (!_isDragging) return;
+  _isDragging = false;
+  openSetsState.forEach(idx => {
+    const el = document.getElementById(`sets-${idx}`);
+    if (el) el.classList.add('open');
+  });
+}
+
+function mergeGroups(exs, groupA, groupB) {
+  // groupB'yi groupA'ya dahil et
+  exs.forEach(ex => {
+    if (ex.ssGroup === groupB) ex.ssGroup = groupA;
+  });
+}
+
+function wouldSplitGroup(exs, srcIdx, destIdx) {
+  // destIdx'e bağımsız bir egzersiz eklendiğinde SS grubunu böler mi?
+  const srcGroup = exs[srcIdx]?.ssGroup;
+  // Hedef pozisyonun hemen öncesi ve sonrası aynı SS grubundaysa bölünür
+  const before = exs[destIdx - 1];
+  const after = exs[destIdx];
+  if (!before || !after) return false;
+  if (!before.ssGroup || !after.ssGroup) return false;
+  if (before.ssGroup !== after.ssGroup) return false;
+  // Kaynak bu grubun üyesiyse sorun yok
+  if (srcGroup && srcGroup === before.ssGroup) return false;
+  return true;
+}
+
+function getSupersetGroup(exs, idx) {
+  return exs[idx]?.ssGroup || null;
+}
+
+function getGroupIndices(exs, groupId) {
+  if (!groupId) return [];
+  return exs.map((ex, i) => ex.ssGroup === groupId ? i : -1).filter(i => i !== -1);
+}
+
+function fixSupersetIndices(exs, fromIdx, toIdx) {
+  // ssGroup tabanlı sistemde index güncellemeye gerek yok
+}
+
+function moveSupersetPair(exs, srcIdx, destIdx) {
+  const groupId = getSupersetGroup(exs, srcIdx);
+  const groupIdxs = getGroupIndices(exs, groupId).sort((a,b) => a-b);
+
+  // Grup elemanlarını çıkar (büyükten küçüğe)
+  const members = [];
+  for (let i = groupIdxs.length - 1; i >= 0; i--) {
+    members.unshift(exs.splice(groupIdxs[i], 1)[0]);
+  }
+
+  // Hedef index'i güncelle
+  let insertAt = destIdx;
+  for (const gi of groupIdxs) {
+    if (gi < destIdx) insertAt--;
+  }
+  insertAt = Math.max(0, Math.min(insertAt, exs.length));
+
+  // Grubu yeni konuma ekle
+  exs.splice(insertAt, 0, ...members);
+}
 
 function initDragDrop(cardEl, ei) {
   cardEl.setAttribute('draggable', 'true');
@@ -2017,15 +2146,19 @@ function initDragDrop(cardEl, ei) {
 
   cardEl.addEventListener('dragstart', e => {
     dragSrcIdx = ei;
+    _isDragging = true;
+    saveOpenSets();
     e.dataTransfer.effectAllowed = 'move';
     setTimeout(() => cardEl.style.opacity = '0.5', 0);
   });
   cardEl.addEventListener('dragend', () => {
     cardEl.style.opacity = '';
+    stopAutoScroll();
     document.querySelectorAll('.workout-card').forEach(c => c.classList.remove('drag-over'));
   });
   cardEl.addEventListener('dragover', e => {
     e.preventDefault();
+    startAutoScroll(e.clientY);
     e.dataTransfer.dropEffect = 'move';
     document.querySelectorAll('.workout-card').forEach(c => c.classList.remove('drag-over'));
     cardEl.classList.add('drag-over');
@@ -2036,8 +2169,31 @@ function initDragDrop(cardEl, ei) {
     cardEl.classList.remove('drag-over');
     if (dragSrcIdx === null || dragSrcIdx === ei) return;
     const exs = state.days[activeDay].exercises;
-    const [moved] = exs.splice(dragSrcIdx, 1);
-    exs.splice(ei, 0, moved);
+    const groupId = getSupersetGroup(exs, dragSrcIdx);
+    const targetGroupId = getSupersetGroup(exs, ei);
+
+    // SS grubu içi yer değiştirme — aynı gruptaki egzersizler yer değiştirebilir
+    if (groupId && groupId === targetGroupId) {
+      const [moved] = exs.splice(dragSrcIdx, 1);
+      const insertAt = Math.max(0, Math.min(ei > dragSrcIdx ? ei : ei, exs.length));
+      exs.splice(insertAt, 0, moved);
+    } else if (groupId && targetGroupId && groupId !== targetGroupId) {
+      // Farklı iki SS grubu → birleştir
+      mergeGroups(exs, targetGroupId, groupId);
+      moveSupersetPair(exs, dragSrcIdx, ei);
+    } else if (!groupId && wouldSplitGroup(exs, dragSrcIdx, ei)) {
+      // Bağımsız egzersizin SS zinciri içine girmesini engelle
+      dragSrcIdx = null; return;
+    } else if (groupId) {
+      moveSupersetPair(exs, dragSrcIdx, ei);
+    } else {
+      // SS bağlı değil — normal taşı
+      const [moved] = exs.splice(dragSrcIdx, 1);
+      const insertAt = Math.max(0, Math.min(ei > dragSrcIdx ? ei - 1 : ei, exs.length));
+      exs.splice(insertAt, 0, moved);
+      fixSupersetIndices(exs, dragSrcIdx, insertAt);
+    }
+
     dragSrcIdx = null;
     saveState();
     render();
@@ -2081,6 +2237,8 @@ function initDragDrop(cardEl, ei) {
     dragActive = false;
     longPressTimer = setTimeout(() => {
       dragActive = true;
+      _isDragging = true;
+      saveOpenSets();
       createGhost();
     }, 500);
   }, { passive: true });
@@ -2100,6 +2258,7 @@ function initDragDrop(cardEl, ei) {
     const touch = e.touches[0];
     const rect = ghost.getBoundingClientRect();
     ghost.style.top = (touch.clientY - rect.height / 2) + 'px';
+    startAutoScroll(touch.clientY);
 
     // Move placeholder to indicate drop position
     const target = getCardAtY(touch.clientY);
@@ -2116,11 +2275,11 @@ function initDragDrop(cardEl, ei) {
   cardEl.addEventListener('touchend', e => {
     clearTimeout(longPressTimer);
     longPressTimer = null;
+    stopAutoScroll();
     if (!dragActive || touchSrcIdx === null) {
       removeGhost();
       dragActive = false; touchSrcIdx = null; return;
     }
-    // Find new index from placeholder position
     if (placeholder) {
       const allCards = [...document.querySelectorAll('.workout-card')];
       const siblings = [...placeholder.parentNode.children];
@@ -2130,9 +2289,26 @@ function initDragDrop(cardEl, ei) {
         if (allCards.includes(el) && el !== cardEl) count++;
       }
       const exs = state.days[activeDay].exercises;
+      const groupId = getSupersetGroup(exs, touchSrcIdx);
+      const targetGroupId = newIdx < exs.length ? getSupersetGroup(exs, newIdx) : null;
+
+      // Bağımsız egzersizin SS zinciri içine girmesini engelle
+      if (!groupId && wouldSplitGroup(exs, touchSrcIdx, newIdx)) {
+        removeGhost(); dragActive = false; touchSrcIdx = null; return;
+      }
+
       if (newIdx !== touchSrcIdx) {
-        const [moved] = exs.splice(touchSrcIdx, 1);
-        exs.splice(newIdx, 0, moved);
+        if (groupId && targetGroupId && groupId !== targetGroupId) {
+          mergeGroups(exs, targetGroupId, groupId);
+          moveSupersetPair(exs, touchSrcIdx, newIdx);
+        } else if (groupId) {
+          moveSupersetPair(exs, touchSrcIdx, newIdx);
+        } else {
+          const [moved] = exs.splice(touchSrcIdx, 1);
+          const insertAt = Math.max(0, Math.min(touchSrcIdx < newIdx ? newIdx - 1 : newIdx, exs.length));
+          exs.splice(insertAt, 0, moved);
+          fixSupersetIndices(exs, touchSrcIdx, insertAt);
+        }
         saveState();
       }
     }
@@ -2150,6 +2326,7 @@ function render() {
   document.getElementById('readonlyBanner').style.display = isReadonly ? '' : 'none';
   updateTimerBar();
   updateMainScroll();
+  _isDragging = false;
 }
 
 // ── SCROLL LOCK ──
@@ -2306,10 +2483,26 @@ function renderContent() {
   content.innerHTML = '';
 
   day.exercises.forEach((ex, ei) => {
-    const allSetsDone = Array.from({length: ex.sets}, (_, s) => sets[`${activeDay}-${ei}-${s}`]?.done).every(Boolean);
+    // Superset grup kontrolü
+    const ssGroup = ex.ssGroup || null;
+    const hasSS = !!ssGroup;
+
+    const ownSetsDone = Array.from({length: ex.sets}, (_, s) => sets[`${activeDay}-${ei}-${s}`]?.done).every(Boolean);
+    let partnerSetsDone = true;
+    if (hasSS) {
+      day.exercises.forEach((e2, i2) => {
+        if (i2 !== ei && e2.ssGroup === ssGroup) {
+          const done = Array.from({length: e2.sets}, (_, s) => sets[`${activeDay}-${i2}-${s}`]?.done).every(Boolean);
+          if (!done) partnerSetsDone = false;
+        }
+      });
+    }
+    const allSetsDone = ownSetsDone && partnerSetsDone;
+
     const card = document.createElement('div');
     card.className = 'workout-card' + (allSetsDone ? ' completed' : '');
     card.id = `card-${ei}`;
+    if (hasSS) card.style.borderLeft = `3px solid var(--accent)`;
     const doneCount = Array.from({length: ex.sets}, (_, s) => sets[`${activeDay}-${ei}-${s}`]?.done ? 1 : 0).reduce((a,b)=>a+b,0);
 
     if (isReadonly) {
@@ -2381,7 +2574,7 @@ function renderContent() {
             <div class="exercise-check" ${allSetsDone ? `onclick="event.stopPropagation();resetExercise(${ei})" style="cursor:pointer" title="${t('resetTitle')}"` : ''} >${allSetsDone ? '✓' : ''}</div>
           </div>
         </div>
-        <div class="sets-container ${!allSetsDone ? 'open' : ''}" id="sets-${ei}">
+        <div class="sets-container ${_isDragging ? (openSetsState.has(ei) ? 'open' : '') : (!allSetsDone ? 'open' : '')}" id="sets-${ei}">
           ${setRows}
           ${ex.note ? `<div class="exercise-note">📋 ${ex.note}</div>` : ''}
         </div>
@@ -2389,7 +2582,63 @@ function renderContent() {
     }
     if (!isReadonly) initDragDrop(card, ei);
     content.appendChild(card);
+
+    // SS bağlantı çizgisi — bir sonraki egzersiz aynı gruptaysa göster
+    const nextEx = day.exercises[ei + 1];
+    if (hasSS && nextEx && nextEx.ssGroup === ssGroup) {
+      const connector = document.createElement('div');
+      connector.id = `ss-connector-${ei}`;
+      connector.style.cssText = `display:flex;align-items:center;gap:8px;margin:-4px 0;padding:0 16px;`;
+      connector.innerHTML = `
+        <div style="width:2px;height:24px;background:var(--accent);border-radius:1px;margin-left:18px;opacity:0.6"></div>
+        <span style="font-size:10px;font-weight:800;color:var(--accent);letter-spacing:0.5px;background:var(--accent-soft);padding:2px 7px;border-radius:6px;">SUPERSET</span>
+        <div style="flex:1;height:2px;background:var(--accent);opacity:0.2;border-radius:1px"></div>
+      `;
+      content.appendChild(connector);
+    }
   });
+
+  // En üste ve en alta bırakma desteği
+  if (!isReadonly) {
+    content.addEventListener('dragover', e => { e.preventDefault(); });
+    content.addEventListener('drop', e => {
+      e.preventDefault();
+      if (dragSrcIdx === null) return;
+      const exs = state.days[activeDay].exercises;
+      if (e.target.closest('.workout-card')) return;
+      const groupId = getSupersetGroup(exs, dragSrcIdx);
+
+      // Parmağın content içindeki Y pozisyonuna göre üst/alt karar ver
+      const contentRect = content.getBoundingClientRect();
+      const firstCard = content.querySelector('.workout-card');
+      const firstCardTop = firstCard ? firstCard.getBoundingClientRect().top : contentRect.bottom;
+      const isTopZone = e.clientY < firstCardTop;
+
+      if (isTopZone) {
+        // En üste taşı
+        if (groupId) {
+          moveSupersetPair(exs, dragSrcIdx, 0);
+        } else {
+          const [moved] = exs.splice(dragSrcIdx, 1);
+          exs.unshift(moved);
+          fixSupersetIndices(exs, dragSrcIdx, 0);
+        }
+      } else {
+        // En alta taşı
+        if (groupId) {
+          moveSupersetPair(exs, dragSrcIdx, exs.length);
+        } else {
+          const [moved] = exs.splice(dragSrcIdx, 1);
+          exs.push(moved);
+          fixSupersetIndices(exs, dragSrcIdx, exs.length - 1);
+        }
+      }
+      dragSrcIdx = null;
+      saveState();
+      render();
+    });
+  }
+
   renderAddButton(!isReadonly);
   // Birim etiketlerini güncelle
   document.querySelectorAll('.weight-unit-label').forEach(el => el.textContent = weightUnit);
@@ -2399,11 +2648,17 @@ function deleteExerciseLive(ei) {
   const card = document.getElementById(`card-${ei}`);
   if (!card) return;
 
-  // Measure card height before any style changes
-  const cardH = card.getBoundingClientRect().height;
+  // SS connector'ları hemen kaldır (bu kartın altındaki ve üstündeki)
+  const connectorAfter = document.getElementById(`ss-connector-${ei}`);
+  if (connectorAfter) connectorAfter.remove();
+  const connectorBefore = document.getElementById(`ss-connector-${ei - 1}`);
+  if (connectorBefore) connectorBefore.remove();
+  // Komşu kartların border'larını temizle (geçici — render düzeltir)
+  const prevCard = document.getElementById(`card-${ei - 1}`);
+  const nextCard = document.getElementById(`card-${ei + 1}`);
+  if (prevCard) prevCard.style.borderLeft = '';
+  if (nextCard) nextCard.style.borderLeft = '';
 
-  // Apply a wrapper animation using a keyframe class
-  // Blur out — height collapses instantly after fade completes
   card.style.pointerEvents = 'none';
   card.style.animation = 'blurOutFade 0.35s ease forwards';
 
@@ -2416,7 +2671,20 @@ function deleteExerciseLive(ei) {
   }, 350);
 
   setTimeout(() => {
-    state.days[activeDay].exercises.splice(ei, 1);
+    const exs = state.days[activeDay].exercises;
+
+    // Silinen egzersizin grup üyelerini kontrol et
+    const ssGroup = exs[ei]?.ssGroup;
+    exs.splice(ei, 1);
+
+    // Grup artık tek üyeyse ssGroup'u temizle
+    if (ssGroup) {
+      const remaining = exs.filter(e => e.ssGroup === ssGroup);
+      if (remaining.length <= 1) {
+        remaining.forEach(e => { e.ssGroup = null; });
+      }
+    }
+
     const newSets = {};
     Object.entries(sessionSets).forEach(([key, val]) => {
       const parts = key.split('-');
@@ -2429,7 +2697,6 @@ function deleteExerciseLive(ei) {
     saveState();
     saveCurrentWeekToHistory();
     render();
-    // Egzersiz kalmadıysa en üste kaydır
     if (state.days[activeDay].exercises.length === 0) {
       const main = document.querySelector('.main');
       if (main) main.scrollTop = 0;
@@ -2528,9 +2795,22 @@ function completeSet(ei, si) {
   saveCurrentWeekToHistory();
 
   const allSetsDone = Array.from({length: ex.sets}, (_, s) => sessionSets[`${activeDay}-${ei}-${s}`]?.done).every(Boolean);
-  if (allSetsDone) showFlash(t('exerciseDone', ex.name));
 
-  preserveInputValues(ei);
+  if (allSetsDone) {
+    const ssGroup = ex.ssGroup || null;
+    if (ssGroup) {
+      const allGroupDone = state.days[activeDay].exercises.every((e, i) => {
+        if (e.ssGroup !== ssGroup) return true;
+        return Array.from({length: e.sets}, (_, s) => sessionSets[`${activeDay}-${i}-${s}`]?.done).every(Boolean);
+      });
+      if (allGroupDone) showFlash(t('supersetDone'));
+    } else {
+      showFlash(t('exerciseDone', ex.name));
+    }
+  }
+
+  // Tüm egzersizlerin input değerlerini kaydet
+  state.days[activeDay].exercises.forEach((_, i) => preserveInputValues(i));
   render();
   const container = document.getElementById(`sets-${ei}`);
   if (container && !allSetsDone) container.classList.add('open');
@@ -2642,7 +2922,11 @@ function applyIcons() {
 function goHome() {
   closeSidebar();
   viewingWeek = null;
+  activeDay = getTodayIndex();
   render();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  const main = document.querySelector('.main');
+  if (main) main.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 const EXERCISE_LIBRARY = {
@@ -2708,12 +2992,31 @@ function openAddExerciseModal() {
   document.getElementById('newExSets').value = 3;
   document.getElementById('newExReps').value = 10;
   document.getElementById('newExNote').value = '';
+  // Reset superset toggle
+  _supersetNew = false;
+  const tog = document.getElementById('supersetToggle');
+  const thumb = document.getElementById('supersetThumb');
+  if (tog) { tog.style.background = 'var(--border)'; }
+  if (thumb) { thumb.style.left = '2px'; }
+  // Hide superset option if no previous exercise
+  const hasPrev = state.days[activeDay].exercises.length > 0;
+  const ssRow = document.getElementById('supersetRow');
+  if (ssRow) ssRow.style.display = hasPrev ? '' : 'none';
   libraryActiveGroup = null;
   renderLibrary();
   document.getElementById('addExerciseOverlay').classList.add('open');
   unlockScroll();
   document.body.style.overflow = 'hidden';
   initModalSwipe();
+}
+
+let _supersetNew = false;
+function toggleSupersetNew() {
+  _supersetNew = !_supersetNew;
+  const tog = document.getElementById('supersetToggle');
+  const thumb = document.getElementById('supersetThumb');
+  tog.style.background = _supersetNew ? 'var(--accent)' : 'var(--border)';
+  thumb.style.left = _supersetNew ? '20px' : '2px';
 }
 function closeAddExerciseModal() {
   const modal = document.querySelector('#addExerciseOverlay .modal');
@@ -2764,8 +3067,20 @@ function addExercise() {
   const sets = parseInt(document.getElementById('newExSets').value) || 3;
   const reps = document.getElementById('newExReps').value.trim() || '10';
   const note = document.getElementById('newExNote').value.trim();
-  state.days[activeDay].exercises.push({ name, sets, reps, note });
-  const newIdx = state.days[activeDay].exercises.length - 1;
+  const exs = state.days[activeDay].exercises;
+  let ssGroup = null;
+  if (_supersetNew && exs.length > 0) {
+    const prevEx = exs[exs.length - 1];
+    if (prevEx.ssGroup) {
+      ssGroup = prevEx.ssGroup;
+    } else {
+      // Yeni grup ID oluştur
+      ssGroup = 'ss_' + Date.now();
+      prevEx.ssGroup = ssGroup;
+    }
+  }
+  exs.push({ name, sets, reps, note, ssGroup });
+  const newIdx = exs.length - 1;
   saveState();
   closeAddExerciseModal();
   render();
@@ -3025,7 +3340,7 @@ function calcLastWeekVolume() {
 function detectPRs() {
   const day = state.days[activeDay];
   if (!day) return [];
-  const history = (() => { try { return JSON.parse(localStorage.getItem('antrenman_history_v1') || '{}'); } catch(e) { return {}; } })();
+  const currentKey = getCurrentWeekKey();
   const prs = [];
   day.exercises.forEach((ex, ei) => {
     let maxKg = 0;
@@ -3035,13 +3350,13 @@ function detectPRs() {
     }
     if (maxKg === 0) return;
     let prevMax = 0;
-    Object.values(history).forEach(week => {
-      const wDay = week[activeDay];
-      if (!wDay || !wDay.sessionSets) return;
-      const wSets = wDay.sessionSets[ei] || {};
-      Object.values(wSets).forEach(s => {
+    Object.entries(history).forEach(([key, week]) => {
+      if (key === currentKey) return; // bu haftayı atla
+      if (!week.sets) return;
+      for (let si = 0; si < ex.sets; si++) {
+        const s = week.sets[`${activeDay}-${ei}-${si}`];
         if (s && s.done) prevMax = Math.max(prevMax, parseFloat(s.kg) || 0);
-      });
+      }
     });
     if (maxKg > prevMax) prs.push(ex.name);
   });
@@ -3090,9 +3405,19 @@ function showWorkoutSummary(elapsed, hideResume) {
     </div>
   `;
   const prCard = document.getElementById('summaryPRCard');
-  prCard.innerHTML = prs.length > 0
-    ? `<span style="color:var(--text-secondary)">${t('summaryPR')}: </span><span style="font-weight:600;color:var(--text)">🏆 ${prs.join(', ')}</span>`
-    : `<span style="color:var(--text-muted)">${t('summaryNoPR')}</span>`;
+  if (prs.length > 0) {
+    const shown = prs.slice(0, 3);
+    const rest = prs.length - shown.length;
+    prCard.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:${shown.length > 0 ? '8px' : '0'}">
+        <span style="color:var(--text-secondary);font-size:12px">${t('summaryPR')}</span>
+        ${rest > 0 ? `<button onclick="openPRPanel()" style="font-size:11px;font-weight:600;color:var(--accent);background:none;border:none;cursor:pointer;padding:0">+${rest} ${lang === 'tr' ? 'daha' : 'more'} →</button>` : ''}
+      </div>
+      ${shown.map(name => `<div style="display:flex;align-items:center;gap:6px;padding:3px 0"><span style="font-size:13px">🏆</span><span style="font-size:13px;font-weight:500;color:var(--text)">${name}</span></div>`).join('')}
+    `;
+  } else {
+    prCard.innerHTML = `<span style="color:var(--text-muted)">${t('summaryNoPR')}</span>`;
+  }
   document.getElementById('summaryCloseBtn').textContent = t('summaryClose');
   document.getElementById('summaryResumeBtn').textContent = t('summaryResume');
   document.getElementById('summaryResumeBtn').style.display = hideResume ? 'none' : '';
@@ -3102,6 +3427,16 @@ function showWorkoutSummary(elapsed, hideResume) {
     m.style.transform = 'scale(1)';
     m.style.opacity = '1';
   });
+}
+
+function openPRPanel() {
+  closeWorkoutSummary();
+  openPanel('progress');
+  // PR sekmesine geç — kısa gecikme ile panel açılmasını bekle
+  setTimeout(() => {
+    const prBtn = document.querySelector('[data-tab="pr"]');
+    if (prBtn) prBtn.click();
+  }, 150);
 }
 
 function startNewWorkout() {
