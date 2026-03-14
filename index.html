@@ -3834,22 +3834,20 @@ function initSidebarSwipe() {
   if (!sidebar || sidebar._swipeInit) return;
   sidebar._swipeInit = true;
 
-  const handle = sidebar.querySelector('.sidebar-handle-bar');
-  const header = sidebar.querySelector('.sidebar-header');
-  const dragZone = handle || header;
-  if (!dragZone) return;
+  const body = document.getElementById('sidebarBody');
+  let startY = 0, startX = 0, startScrollTop = 0;
 
-  let startY = 0, startX = 0;
-
-  dragZone.addEventListener('touchstart', e => {
+  sidebar.addEventListener('touchstart', e => {
     startY = e.touches[0].clientY;
     startX = e.touches[0].clientX;
+    startScrollTop = body ? body.scrollTop : 0;
   }, { passive: true });
 
-  dragZone.addEventListener('touchend', e => {
+  sidebar.addEventListener('touchend', e => {
     const dy = e.changedTouches[0].clientY - startY;
     const dx = Math.abs(e.changedTouches[0].clientX - startX);
-    if (dy > 60 && dx < 50) {
+    // Aşağı swipe, yatay değil, ve scroll en üstteydi
+    if (dy > 80 && dx < 60 && startScrollTop <= 0) {
       closeSidebar();
     }
   }, { passive: true });
