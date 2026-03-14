@@ -1119,7 +1119,7 @@
     <h2 data-i18n="addExerciseTitle"></h2>
     <div class="modal-field">
       <label data-i18n="exerciseName"></label>
-      <input type="text" id="newExName" data-i18n-placeholder="exerciseNamePlaceholder">
+      <input type="text" id="newExName" data-i18n-placeholder="exerciseNamePlaceholder" oninput="renderLibrary()">
     </div>
     <!-- Library -->
     <div style="margin-bottom:12px">
@@ -1129,23 +1129,23 @@
     <div class="modal-row">
       <div class="modal-field">
         <label data-i18n="sets"></label>
-        <input type="number" id="newExSets" min="1" max="20" value="3">
+        <input type="number" id="newExSets" min="1" max="20" placeholder="3">
       </div>
       <div class="modal-field">
         <label data-i18n="reps"></label>
-        <input type="text" id="newExReps" data-i18n-placeholder="repsPlaceholder" value="10">
+        <input type="text" id="newExReps" placeholder="10">
       </div>
     </div>
     <div class="modal-field">
       <label data-i18n="noteLabel"></label>
       <textarea id="newExNote" rows="2" data-i18n-placeholder="notePlaceholder" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:14px;font-family:inherit;resize:none;box-sizing:border-box;"></textarea>
     </div>
-    <div id="supersetRow" style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-top:1px solid var(--border-light);margin-top:4px">
+    <div id="supersetRow" style="display:flex;align-items:flex-start;justify-content:space-between;padding:10px 0;border-top:1px solid var(--border-light);margin-top:16px">
       <div>
         <div style="font-size:13px;font-weight:600;color:var(--text)" data-i18n="supersetLabel"></div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:2px" data-i18n="supersetSub"></div>
       </div>
-      <button id="supersetToggle" onclick="toggleSupersetNew()" style="width:44px;height:26px;border-radius:13px;border:none;background:var(--border);cursor:pointer;position:relative;transition:background 0.2s;flex-shrink:0">
+      <button id="supersetToggle" onclick="toggleSupersetNew()" style="width:44px;height:26px;border-radius:13px;border:none;background:var(--border);cursor:pointer;position:relative;transition:background 0.2s;flex-shrink:0;margin-top:8px">
         <span id="supersetThumb" style="position:absolute;left:2px;top:2px;width:22px;height:22px;border-radius:50%;background:#fff;transition:left 0.2s;box-shadow:0 1px 4px rgba(0,0,0,0.2)"></span>
       </button>
     </div>
@@ -2947,28 +2947,39 @@ function renderLibrary() {
   const list = document.getElementById('libraryList');
   if (!filters || !list) return;
 
-  // Filter buttons
-  filters.innerHTML = '';
-  const allBtn = document.createElement('button');
-  allBtn.textContent = lang === 'tr' ? 'Tümü' : 'All';
-  allBtn.style.cssText = `padding:5px 12px;border-radius:20px;border:1px solid var(--border);font-size:12px;font-weight:600;cursor:pointer;background:${libraryActiveGroup === null ? 'var(--accent)' : 'var(--surface2)'};color:${libraryActiveGroup === null ? '#fff' : 'var(--text-secondary)'};`;
-  allBtn.onclick = () => { libraryActiveGroup = null; renderLibrary(); };
-  filters.appendChild(allBtn);
+  const searchTerm = (document.getElementById('newExName')?.value || '').toLowerCase().trim();
 
-  Object.entries(EXERCISE_LIBRARY).forEach(([key, group]) => {
-    const btn = document.createElement('button');
-    btn.textContent = group[lang] || group.en;
-    const isActive = libraryActiveGroup === key;
-    btn.style.cssText = `padding:5px 12px;border-radius:20px;border:1px solid var(--border);font-size:12px;font-weight:600;cursor:pointer;background:${isActive ? 'var(--accent)' : 'var(--surface2)'};color:${isActive ? '#fff' : 'var(--text-secondary)'};`;
-    btn.onclick = () => { libraryActiveGroup = key; renderLibrary(); };
-    filters.appendChild(btn);
-  });
+  // Arama aktifse filtre butonlarını gizle
+  filters.style.display = searchTerm ? 'none' : '';
 
-  // Exercise chips
+  if (!searchTerm) {
+    // Normal grup filtresi
+    filters.innerHTML = '';
+    const allBtn = document.createElement('button');
+    allBtn.textContent = lang === 'tr' ? 'Tümü' : 'All';
+    allBtn.style.cssText = `padding:5px 12px;border-radius:20px;border:1px solid var(--border);font-size:12px;font-weight:600;cursor:pointer;background:${libraryActiveGroup === null ? 'var(--accent)' : 'var(--surface2)'};color:${libraryActiveGroup === null ? '#fff' : 'var(--text-secondary)'};`;
+    allBtn.onclick = () => { libraryActiveGroup = null; renderLibrary(); };
+    filters.appendChild(allBtn);
+
+    Object.entries(EXERCISE_LIBRARY).forEach(([key, group]) => {
+      const btn = document.createElement('button');
+      btn.textContent = group[lang] || group.en;
+      const isActive = libraryActiveGroup === key;
+      btn.style.cssText = `padding:5px 12px;border-radius:20px;border:1px solid var(--border);font-size:12px;font-weight:600;cursor:pointer;background:${isActive ? 'var(--accent)' : 'var(--surface2)'};color:${isActive ? '#fff' : 'var(--text-secondary)'};`;
+      btn.onclick = () => { libraryActiveGroup = key; renderLibrary(); };
+      filters.appendChild(btn);
+    });
+  }
+
+  // Chip'leri oluştur
   list.innerHTML = '';
-  const groups = libraryActiveGroup ? { [libraryActiveGroup]: EXERCISE_LIBRARY[libraryActiveGroup] } : EXERCISE_LIBRARY;
+  const groups = searchTerm
+    ? EXERCISE_LIBRARY // arama varsa tüm gruplarda ara
+    : (libraryActiveGroup ? { [libraryActiveGroup]: EXERCISE_LIBRARY[libraryActiveGroup] } : EXERCISE_LIBRARY);
+
   Object.values(groups).forEach(group => {
     group.exercises.forEach(name => {
+      if (searchTerm && !name.toLowerCase().includes(searchTerm)) return;
       const chip = document.createElement('button');
       chip.textContent = name;
       chip.style.cssText = 'padding:4px 10px;border-radius:20px;border:1px solid var(--border);font-size:12px;background:var(--surface2);color:var(--text);cursor:pointer;white-space:nowrap;';
@@ -2977,20 +2988,26 @@ function renderLibrary() {
         chip.style.background = 'var(--accent)';
         chip.style.color = '#fff';
         chip.style.borderColor = 'var(--accent)';
-        // Reset other chips
         list.querySelectorAll('button').forEach(c => {
           if (c !== chip) { c.style.background = 'var(--surface2)'; c.style.color = 'var(--text)'; c.style.borderColor = 'var(--border)'; }
         });
+        // Chip seçilince aramayı sıfırla
+        renderLibrary();
       };
       list.appendChild(chip);
     });
   });
+
+  // Sonuç yoksa mesaj göster
+  if (searchTerm && list.children.length === 0) {
+    list.innerHTML = `<span style="font-size:12px;color:var(--text-muted);padding:4px">${lang === 'tr' ? 'Sonuç bulunamadı' : 'No results'}</span>`;
+  }
 }
 
 function openAddExerciseModal() {
   document.getElementById('newExName').value = '';
-  document.getElementById('newExSets').value = 3;
-  document.getElementById('newExReps').value = 10;
+  document.getElementById('newExSets').value = '';
+  document.getElementById('newExReps').value = '';
   document.getElementById('newExNote').value = '';
   // Reset superset toggle
   _supersetNew = false;
