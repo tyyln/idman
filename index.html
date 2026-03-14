@@ -2758,8 +2758,8 @@ function render() {
 // ── SCROLL LOCK ──
 let _scrollLocked = false;
 function _preventScroll(e) {
-  // Allow scrolling inside sidebar, modals, settings, and day tabs
-  const allowed = e.target.closest('.sidebar-body, .modal, .settings-sheet, .sidebar, .day-tabs');
+  // Sidebar, modal, settings içinde scroll'a izin ver
+  const allowed = e.target.closest('#sidebarBody, .modal, .settings-sheet, .day-tabs');
   if (!allowed) e.preventDefault();
 }
 function lockScroll() {
@@ -3816,42 +3816,27 @@ function initSidebarSwipe() {
   if (!sidebar || sidebar._swipeInit) return;
   sidebar._swipeInit = true;
 
-  // ── KAPATMA SWIPE'I (sadece handle/header'dan aşağı) ──
-  let closeStartY = 0, closeCurrentY = 0, closeDragging = false;
+  let startY = 0, startX = 0, fromHandle = false;
 
-  function onCloseStart(e) {
+  sidebar.addEventListener('touchstart', e => {
     const touch = e.touches[0];
     const target = document.elementFromPoint(touch.clientX, touch.clientY);
-    const isFromHandle = handle?.contains(target) || handle === target;
-    const isFromHeader = header?.contains(target) || header === target;
-    if (!isFromHandle && !isFromHeader) return;
-    closeStartY = touch.clientY;
-    closeCurrentY = 0;
-    closeDragging = true;
-    sidebar.style.transition = 'none';
-  }
-  function onCloseMove(e) {
-    if (!closeDragging) return;
-    closeCurrentY = e.touches[0].clientY - closeStartY;
-    if (closeCurrentY < 0) closeCurrentY = 0;
-    if (closeCurrentY > 0) e.preventDefault();
-    sidebar.style.transform = `translateY(${closeCurrentY}px)`;
-  }
-  function onCloseEnd() {
-    if (!closeDragging) return;
-    closeDragging = false;
-    sidebar.style.transition = '';
-    if (closeCurrentY > 80) {
-      sidebar.style.transform = '';
-      closeSidebar();
-    } else {
-      sidebar.style.transform = 'translateY(0)';
-    }
-  }
+    fromHandle = !!(handle?.contains(target) || handle === target ||
+                    header?.contains(target) || header === target);
+    startY = touch.clientY;
+    startX = touch.clientX;
+  }, { passive: true });
 
-  sidebar.addEventListener('touchstart', onCloseStart, { passive: true });
-  sidebar.addEventListener('touchmove', onCloseMove, { passive: false });
-  sidebar.addEventListener('touchend', onCloseEnd, { passive: true });
+  sidebar.addEventListener('touchend', e => {
+    if (!fromHandle) return;
+    const dy = e.changedTouches[0].clientY - startY;
+    const dx = Math.abs(e.changedTouches[0].clientX - startX);
+    // Aşağı swipe, yatay değil
+    if (dy > 80 && dx < 40) {
+      closeSidebar();
+    }
+    fromHandle = false;
+  }, { passive: true });
 }
 
 function setWeightUnit(unit) {
