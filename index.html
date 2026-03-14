@@ -2190,8 +2190,16 @@ function renderWeightPanel() {
     scrollWrap.style.cssText = 'overflow-x:auto;-webkit-overflow-scrolling:touch;margin:8px 0 16px;padding-bottom:4px';
 
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('width', W); svg.setAttribute('height', H + 20);
-    svg.style.cssText = 'display:block;min-width:100%';
+    if (allSorted.length === 1) {
+      // Tek nokta — 100% genişlik, ortalanmış
+      svg.setAttribute('viewBox', `0 0 ${W} ${H + 20}`);
+      svg.setAttribute('width', '100%');
+      svg.setAttribute('height', H + 20);
+      svg.style.cssText = 'display:block';
+    } else {
+      svg.setAttribute('width', W); svg.setAttribute('height', H + 20);
+      svg.style.cssText = 'display:block;min-width:100%';
+    }
 
     if (allSorted.length > 1) {
       const points = allSorted.map((d, i) => {
