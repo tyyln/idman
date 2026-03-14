@@ -1481,7 +1481,7 @@ let viewingWeek = null;
 // On startup, find the most recent past week and copy its completed
 // kg/reps into state.days[].exercises[].lastKg/lastReps so they
 // appear as placeholders this week.
-(function carryOverLastWeek() {
+function carryOverLastWeek() {
   const currentKey = getCurrentWeekKey();
   const pastKeys = Object.keys(history)
     .filter(k => k < currentKey)
@@ -1491,7 +1491,6 @@ let viewingWeek = null;
   const lastWeek = history[pastKeys[0]];
   if (!lastWeek?.sets) return;
 
-  // Map by exercise name so we survive exercise reordering
   state.days.forEach((day, di) => {
     day.exercises.forEach((ex, ei) => {
       for (let s = 0; s < ex.sets; s++) {
@@ -1500,14 +1499,14 @@ let viewingWeek = null;
         if (sd?.done) {
           if (!ex.lastKg) ex.lastKg = [];
           if (!ex.lastReps) ex.lastReps = [];
-          // Only overwrite if not already set by a more recent completed set
           if (ex.lastKg[s] === undefined) ex.lastKg[s] = sd.kg;
           if (ex.lastReps[s] === undefined) ex.lastReps[s] = sd.reps;
         }
       }
     });
   });
-})();
+}
+carryOverLastWeek();
 
 // ── WEEK KEY ──
 function getWeekKey(date) {
@@ -1819,10 +1818,15 @@ function renderProgressPanel() {
   body.appendChild(contentWrap);
   requestAnimationFrame(() => initTabSwipe(contentWrap, tabBar));
   function drawChartTab() {
+    // İsme göre unique egzersizler — ilk bulunan index'i kullan
+    const seen = new Set();
     const exercises = [];
     state.days.forEach((day, di) => {
       day.exercises.forEach((ex, ei) => {
-        exercises.push({ name: ex.name, di, ei });
+        if (!seen.has(ex.name)) {
+          seen.add(ex.name);
+          exercises.push({ name: ex.name, di, ei });
+        }
       });
     });
 
@@ -1846,6 +1850,9 @@ function renderProgressPanel() {
     // Egzersiz listesi (arama sonuçları)
     const listWrap = document.createElement('div');
     listWrap.style.cssText = 'padding:0 16px 8px;display:flex;flex-direction:column;gap:4px;max-height:160px;overflow-y:auto;';
+    // Liste scroll'undan sidebar kapatma tetiklenmesin
+    listWrap.addEventListener('touchstart', e => e.stopPropagation(), { passive: true });
+    listWrap.addEventListener('touchend', e => e.stopPropagation(), { passive: true });
     contentWrap.appendChild(listWrap);
 
     const chartWrap = document.createElement('div');
@@ -4314,9 +4321,12 @@ function importData(event) {
       saveState();
       try { localStorage.setItem(HISTORY_KEY, JSON.stringify(history)); } catch(err) {}
       saveSession();
-      flash(t('restoreSuccess'));
-      render();
       closeSettings();
+      carryOverLastWeek();
+      render();
+      applyI18n();
+      applyIcons();
+      flash(t('restoreSuccess'));
     } catch(err) {
       console.error('Import error:', err);
       flash(t('restoreError'));
