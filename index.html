@@ -1468,7 +1468,10 @@ function loadSession() {
 }
 function saveSession() {
   try {
-    const { _savedWeekKey, ...setsToSave } = sessionSets;
+    const setsToSave = {};
+    Object.entries(sessionSets).forEach(([k, v]) => {
+      if (k !== '_savedWeekKey') setsToSave[k] = v;
+    });
     localStorage.setItem(SESSION_KEY, JSON.stringify({ weekKey: getCurrentWeekKey(), sets: setsToSave }));
   } catch(e) {}
 }
@@ -1998,6 +2001,9 @@ function renderProgressPanel() {
         lbl.setAttribute('transform', `rotate(-40, ${lx}, ${ly})`);
         if (d.label.includes('(')) {
           lbl.textContent = d.label.replace(/\s*\(.*\)/, '') + ' ★';
+        } else {
+          lbl.textContent = d.label;
+        }
         svg.appendChild(lbl);
       });
       scrollWrap.appendChild(svg);
