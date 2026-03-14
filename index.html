@@ -1461,14 +1461,21 @@ function loadSession() {
     const saved = localStorage.getItem(SESSION_KEY);
     if (saved) {
       const { weekKey, sets } = JSON.parse(saved);
-      if (weekKey === getCurrentWeekKey()) return sets;
+      if (weekKey === getCurrentWeekKey()) {
+        sets._savedWeekKey = weekKey;
+        return sets;
+      }
     }
   } catch(e) {}
-  return {};
+  const empty = {};
+  empty._savedWeekKey = getCurrentWeekKey();
+  return empty;
 }
 function saveSession() {
   try {
-    localStorage.setItem(SESSION_KEY, JSON.stringify({ weekKey: getCurrentWeekKey(), sets: sessionSets }));
+    sessionSets._savedWeekKey = getCurrentWeekKey();
+    const { _savedWeekKey, ...setsToSave } = sessionSets;
+    localStorage.setItem(SESSION_KEY, JSON.stringify({ weekKey: getCurrentWeekKey(), sets: setsToSave }));
   } catch(e) {}
 }
 
@@ -1569,15 +1576,16 @@ function saveHistory() {
 
 // Save current week session when switching or closing
 function saveCurrentWeekToHistory() {
-  const doneSets = Object.values(sessionSets).filter(s => s?.done);
-  if (doneSets.length === 0) return; // Hiç tamamlanmış set yoksa kaydetme
+  const doneSets = Object.entries(sessionSets).filter(([k, s]) => k !== '_savedWeekKey' && s?.done);
+  if (doneSets.length === 0) return;
   const weekKey = getCurrentWeekKey();
   if (!history[weekKey]) {
-    // First save this week: snapshot both sets and days
     history[weekKey] = { sets: {}, days: JSON.parse(JSON.stringify(state.days)) };
   }
-  // Merge sessionSets into history (never overwrite days snapshot after first save)
-  Object.assign(history[weekKey].sets, sessionSets);
+  // _savedWeekKey hariç merge et
+  Object.entries(sessionSets).forEach(([k, v]) => {
+    if (k !== '_savedWeekKey') history[weekKey].sets[k] = v;
+  });
 
   // Keep lastKg/lastReps up to date in state for next week's placeholders
   state.days.forEach((day, di) => {
@@ -2798,6 +2806,12 @@ function initDragDrop(cardEl, ei) {
 
 // ── RENDER ──
 function render() {
+  // Hafta değişmişse session'ı temizle
+  const currentKey = getCurrentWeekKey();
+  if (sessionSets._savedWeekKey && sessionSets._savedWeekKey !== currentKey) {
+    sessionSets = {};
+    saveSession();
+  }
   renderTabs();
   renderContent();
   const isReadonly = viewingWeek !== null;
