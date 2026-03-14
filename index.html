@@ -1609,8 +1609,7 @@ function openPanel(panel) {
   document.getElementById('sidebar').classList.add('open');
   document.getElementById('sidebarOverlay').classList.add('open');
   unlockScroll();
-  const main = document.querySelector('.main');
-  if (main) main.style.overflow = 'hidden';
+  document.body.style.overflow = 'hidden';
   ['history','progress','weight'].forEach(p => {
     const key = p.charAt(0).toUpperCase() + p.slice(1);
     const btn = document.getElementById('navBtn' + key);
@@ -1637,8 +1636,6 @@ function closeSidebar() {
   sidebar.classList.remove('open');
   if (sidebar._swipeInit) { sidebar._swipeInit = false; }
   document.getElementById('sidebarOverlay').classList.remove('open');
-  const main = document.querySelector('.main');
-  if (main) main.style.overflow = '';
   document.body.style.overflow = '';
   ['History','Progress','Weight'].forEach(p => {
     const btn = document.getElementById('navBtn' + p);
@@ -2761,19 +2758,39 @@ function render() {
 // ── SCROLL LOCK ──
 let _scrollLocked = false;
 function _preventScroll(e) {
-  // Sidebar, modal, settings içinde scroll'a izin ver
   const allowed = e.target.closest('#sidebarBody, .modal, .settings-sheet, .day-tabs');
-  if (!allowed) e.preventDefault();
+  if (allowed) {
+    // Scroll sınırına ulaşıldıysa preventDefault — ortada ise serbest bırak
+    const el = allowed;
+    const atTop = el.scrollTop <= 0;
+    const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
+    const touch = e.touches[0];
+    // İlk touch'u kaydet
+    if (!el._touchStartY) el._touchStartY = touch.clientY;
+    const dy = touch.clientY - el._touchStartY;
+    if ((atTop && dy > 0) || (atBottom && dy < 0)) {
+      e.preventDefault();
+    }
+  } else {
+    e.preventDefault();
+  }
+}
+
+function _preventScrollEnd(e) {
+  const allowed = e.target.closest('#sidebarBody, .modal, .settings-sheet, .day-tabs');
+  if (allowed) delete allowed._touchStartY;
 }
 function lockScroll() {
   if (_scrollLocked) return;
   _scrollLocked = true;
   document.addEventListener('touchmove', _preventScroll, { passive: false });
+  document.addEventListener('touchend', _preventScrollEnd, { passive: true });
 }
 function unlockScroll() {
   if (!_scrollLocked) return;
   _scrollLocked = false;
   document.removeEventListener('touchmove', _preventScroll);
+  document.removeEventListener('touchend', _preventScrollEnd);
 }
 
 function updateMainScroll() {
