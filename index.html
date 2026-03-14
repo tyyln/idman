@@ -3663,22 +3663,27 @@ function importData(event) {
     try {
       const backup = JSON.parse(e.target.result);
       if (!backup.state || !backup.history) throw new Error('invalid');
-      // Restore all data
+
       state = backup.state;
       history = backup.history;
-      // sessionSets'i backup'tan yükle ama sadece mevcut haftanınkini al
+
+      // sessionSets — sadece aynı haftanınkini al
       const currentKey = getCurrentWeekKey();
-      const backupSessionWeekKey = backup.sessionSets?._weekKey;
-      if (backupSessionWeekKey === currentKey) {
-        sessionSets = backup.sessionSets || {};
+      const backupWeekKey = backup.sessionSets?._weekKey;
+      if (backupWeekKey === currentKey) {
+        const { _weekKey, ...sets } = backup.sessionSets;
+        sessionSets = sets;
       } else {
-        // Farklı hafta — session'ı sıfırla
         sessionSets = {};
       }
+
       if (backup.weightLog) {
         try { localStorage.setItem(WEIGHT_KEY, JSON.stringify(backup.weightLog)); } catch(err) {}
       }
+
+      // activeDay'i bugüne ayarla
       activeDay = getTodayIndex();
+
       saveState();
       try { localStorage.setItem(HISTORY_KEY, JSON.stringify(history)); } catch(err) {}
       saveSession();
@@ -3686,6 +3691,7 @@ function importData(event) {
       render();
       closeSettings();
     } catch(err) {
+      console.error('Import error:', err);
       flash(t('restoreError'));
     }
     event.target.value = '';
