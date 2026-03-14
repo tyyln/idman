@@ -1609,7 +1609,8 @@ function openPanel(panel) {
   document.getElementById('sidebar').classList.add('open');
   document.getElementById('sidebarOverlay').classList.add('open');
   unlockScroll();
-  document.body.style.overflow = 'hidden';
+  const main = document.querySelector('.main');
+  if (main) main.style.overflow = 'hidden';
   ['history','progress','weight'].forEach(p => {
     const key = p.charAt(0).toUpperCase() + p.slice(1);
     const btn = document.getElementById('navBtn' + key);
@@ -1636,6 +1637,8 @@ function closeSidebar() {
   sidebar.classList.remove('open');
   if (sidebar._swipeInit) { sidebar._swipeInit = false; }
   document.getElementById('sidebarOverlay').classList.remove('open');
+  const main = document.querySelector('.main');
+  if (main) main.style.overflow = '';
   document.body.style.overflow = '';
   ['History','Progress','Weight'].forEach(p => {
     const btn = document.getElementById('navBtn' + p);
@@ -3811,31 +3814,27 @@ function initSettingsSwipe() {
 
 function initSidebarSwipe() {
   const sidebar = document.getElementById('sidebar');
-  const handle = sidebar?.querySelector('.sidebar-handle-bar');
-  const header = sidebar?.querySelector('.sidebar-header');
   if (!sidebar || sidebar._swipeInit) return;
   sidebar._swipeInit = true;
 
-  let startY = 0, startX = 0, fromHandle = false;
+  const handle = sidebar.querySelector('.sidebar-handle-bar');
+  const header = sidebar.querySelector('.sidebar-header');
+  const dragZone = handle || header;
+  if (!dragZone) return;
 
-  sidebar.addEventListener('touchstart', e => {
-    const touch = e.touches[0];
-    const target = document.elementFromPoint(touch.clientX, touch.clientY);
-    fromHandle = !!(handle?.contains(target) || handle === target ||
-                    header?.contains(target) || header === target);
-    startY = touch.clientY;
-    startX = touch.clientX;
+  let startY = 0, startX = 0;
+
+  dragZone.addEventListener('touchstart', e => {
+    startY = e.touches[0].clientY;
+    startX = e.touches[0].clientX;
   }, { passive: true });
 
-  sidebar.addEventListener('touchend', e => {
-    if (!fromHandle) return;
+  dragZone.addEventListener('touchend', e => {
     const dy = e.changedTouches[0].clientY - startY;
     const dx = Math.abs(e.changedTouches[0].clientX - startX);
-    // Aşağı swipe, yatay değil
-    if (dy > 80 && dx < 40) {
+    if (dy > 60 && dx < 50) {
       closeSidebar();
     }
-    fromHandle = false;
   }, { passive: true });
 }
 
