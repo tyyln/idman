@@ -933,10 +933,13 @@
   .sidebar-body {
     flex: 1;
     overflow-y: auto;
+    overflow-x: hidden;
     padding: 8px 0;
     scrollbar-width: thin;
     scrollbar-color: var(--border) transparent;
     white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
   }
 
   .week-item { border-radius: 10px; margin: 1px 8px; }
@@ -1809,8 +1812,7 @@ function renderProgressPanel() {
 
   const contentWrap = document.createElement('div');
   body.appendChild(contentWrap);
-
-  // ── CHART TAB ──
+  requestAnimationFrame(() => initTabSwipe(contentWrap, tabBar));
   function drawChartTab() {
     const exercises = [];
     state.days.forEach((day, di) => {
@@ -2152,8 +2154,7 @@ function renderWeightPanel() {
   tabBar.appendChild(bioTab);
   body.appendChild(tabBar);
   body.appendChild(contentWrap);
-
-  // ── WEIGHT TAB ──
+  requestAnimationFrame(() => initTabSwipe(contentWrap, tabBar));
   function drawWeightTab() {
     const log = loadWeightLog();
 
@@ -2244,7 +2245,7 @@ function renderWeightPanel() {
   function drawBioTab() {
     const bioLog = loadBioLog();
     const wrap = document.createElement('div');
-    wrap.style.cssText = 'padding:12px 16px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;box-sizing:border-box;width:100%;';
+    wrap.style.cssText = 'padding:12px 16px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;box-sizing:border-box;width:100%;white-space:normal;';
 
     function cmToFtIn(cm) {
       const totalIn = cm / 2.54;
@@ -3737,6 +3738,28 @@ function closeSettings() {
   document.getElementById('settingsOverlay').classList.remove('open');
   document.body.style.overflow = '';
   updateMainScroll();
+}
+
+function initTabSwipe(contentEl, tabBar) {
+  if (!contentEl || contentEl._tabSwipeInit) return;
+  contentEl._tabSwipeInit = true;
+  let startX = 0, startY = 0;
+
+  contentEl.addEventListener('touchstart', e => {
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+  }, { passive: true });
+
+  contentEl.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - startX;
+    const dy = Math.abs(e.changedTouches[0].clientY - startY);
+    // Yatay swipe — dikey kaydırma değilse
+    if (Math.abs(dx) < 50 || dy > 40) return;
+    const tabs = [...tabBar.querySelectorAll('button[data-tab]')];
+    const activeIdx = tabs.findIndex(b => b.style.color === 'var(--accent)');
+    if (dx < 0 && activeIdx < tabs.length - 1) tabs[activeIdx + 1].click();
+    else if (dx > 0 && activeIdx > 0) tabs[activeIdx - 1].click();
+  }, { passive: true });
 }
 
 function initSettingsSwipe() {
