@@ -596,8 +596,10 @@
     max-width: 500px;
     max-height: 85vh;
     overflow-y: auto;
+    overscroll-behavior: contain;
     transform: translateY(100%);
     transition: transform 0.32s cubic-bezier(0.4,0,0.2,1);
+    -webkit-overflow-scrolling: touch;
   }
   .overlay.open .modal { transform: translateY(0); }
   @keyframes slideUp {
@@ -1119,7 +1121,7 @@
     <h2 data-i18n="addExerciseTitle"></h2>
     <div class="modal-field">
       <label data-i18n="exerciseName"></label>
-      <input type="text" id="newExName" data-i18n-placeholder="exerciseNamePlaceholder" oninput="renderLibrary()">
+      <input type="text" id="newExName" data-i18n-placeholder="exerciseNamePlaceholder" oninput="renderLibrary()" onfocus="this.scrollIntoView({behavior:'smooth',block:'nearest'})">
     </div>
     <!-- Library -->
     <div style="margin-bottom:12px">
@@ -1129,7 +1131,7 @@
     <div class="modal-row">
       <div class="modal-field">
         <label data-i18n="sets"></label>
-        <input type="number" id="newExSets" min="1" max="20" placeholder="3">
+        <input type="text" id="newExSets" placeholder="3">
       </div>
       <div class="modal-field">
         <label data-i18n="reps"></label>
@@ -1165,11 +1167,11 @@
     <div class="modal-row">
       <div class="modal-field">
         <label data-i18n="sets"></label>
-        <input type="number" id="editExSets" min="1" max="20">
+        <input type="text" inputmode="numeric" id="editExSets" min="1" max="20">
       </div>
       <div class="modal-field">
         <label data-i18n="reps"></label>
-        <input type="text" id="editExReps" data-i18n-placeholder="repsPlaceholder">
+        <input type="text" inputmode="numeric" id="editExReps" data-i18n-placeholder="repsPlaceholder">
       </div>
     </div>
     <div class="modal-field">
