@@ -1711,41 +1711,41 @@ function renderSidebar() {
 // ── PROGRESS PANEL ──
 function calcStreak() {
   const currentKey = getCurrentWeekKey();
-  // Haftanın aktif olup olmadığını kontrol et
+
   function isWeekActive(key) {
     const hw = history[key];
     if (!hw || !hw.sets) return false;
     return Object.values(hw.sets).some(s => s && s.done);
   }
-  // Bu hafta aktif mi?
-  const thisWeekActive = Object.values(sessionSets).some(s => s && s.done);
 
-  // Tüm hafta key'lerini sırala
+  const thisWeekActive = Object.values(sessionSets).some(s => s && s.done);
   const allKeys = Object.keys(history).filter(k => k !== currentKey).sort();
 
-  // Mevcut streak — bu haftadan geriye say
-  let current = thisWeekActive ? 1 : 0;
-  if (allKeys.length > 0) {
-    // Geçen haftadan başla geriye git
-    const startIdx = current > 0 ? allKeys.length - 1 : allKeys.length - 1;
-    for (let i = startIdx; i >= 0; i--) {
+  // Mevcut streak: bu haftadan veya geçen haftadan geriye say
+  let current = 0;
+  if (thisWeekActive) {
+    current = 1;
+    for (let i = allKeys.length - 1; i >= 0; i--) {
       if (isWeekActive(allKeys[i])) current++;
       else break;
     }
-    if (!thisWeekActive) current = 0; // Bu hafta aktif değilse geçmişe bakmaya gerek yok
+  } else {
+    // Bu hafta aktif değil — geçen haftadan itibaren ardışık say
+    for (let i = allKeys.length - 1; i >= 0; i--) {
+      if (isWeekActive(allKeys[i])) current++;
+      else break;
+    }
   }
 
   // Tüm zamanların rekoru
+  const allActiveKeys = [...allKeys, ...(thisWeekActive ? [currentKey] : [])];
   let best = 0, temp = 0;
+  // Sadece history key'lerini kullan
   allKeys.forEach(key => {
     if (isWeekActive(key)) { temp++; best = Math.max(best, temp); }
     else temp = 0;
   });
-  if (thisWeekActive) {
-    temp++;
-    best = Math.max(best, temp);
-  }
-  // Mevcut streak rekordan büyük olamaz
+  if (thisWeekActive) { temp++; best = Math.max(best, temp); }
   best = Math.max(best, current);
 
   return { current, best };
@@ -1883,12 +1883,14 @@ function renderProgressPanel() {
       });
     }
 
-    document.getElementById('chartSearch')?.addEventListener('input', e => {
-      renderList(e.target.value);
-    });
-
     renderList('');
     drawChart(0);
+    requestAnimationFrame(() => {
+      const searchInput = document.getElementById('chartSearch');
+      if (searchInput) {
+        searchInput.addEventListener('input', e => renderList(e.target.value));
+      }
+    });
 
     function drawChart(exIdx) {
       chartWrap.innerHTML = '';
@@ -3992,8 +3994,10 @@ function toggleWorkout() {
 
 function calcWorkoutStats() {
   const isReadonly = viewingWeek !== null;
-  const day = isReadonly ? (history[viewingWeek]?.days || state.days)[activeDay] : state.days[activeDay];
-  const sets = isReadonly ? (history[viewingWeek]?.sets || {}) : sessionSets;
+  const weekData = isReadonly ? history[viewingWeek] : null;
+  const days = isReadonly ? (weekData?.days || state.days) : state.days;
+  const sets = isReadonly ? (weekData?.sets || {}) : sessionSets;
+  const day = days[activeDay];
   if (!day) return { done: 0, total: 0, volume: 0, exercises: 0 };
   let done = 0, total = 0, volume = 0, exercises = 0;
   day.exercises.forEach((ex, ei) => {
