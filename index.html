@@ -4326,10 +4326,10 @@ function importData(event) {
       render();
       applyI18n();
       applyIcons();
-      flash(t('restoreSuccess'));
+      showFlash(t('restoreSuccess'));
     } catch(err) {
       console.error('Import error:', err);
-      flash(t('restoreError'));
+      showFlash(t('restoreError'));
     }
     event.target.value = '';
   };
