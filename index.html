@@ -1831,19 +1831,56 @@ function renderProgressPanel() {
       return;
     }
 
-    const sel = document.createElement('select');
-    sel.style.cssText = 'width:calc(100% - 32px);padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:14px;margin:16px 16px 12px;cursor:pointer;display:block;';
-    exercises.forEach((ex, idx) => {
-      const opt = document.createElement('option');
-      opt.value = idx;
-      opt.textContent = ex.name;
-      sel.appendChild(opt);
-    });
-    contentWrap.appendChild(sel);
+    let selectedIdx = 0;
+
+    // Arama input
+    const searchWrap = document.createElement('div');
+    searchWrap.style.cssText = 'padding:12px 16px 4px;position:relative;';
+    searchWrap.innerHTML = `
+      <input id="chartSearch" type="text" placeholder="${lang === 'tr' ? 'Egzersiz ara...' : 'Search exercise...'}"
+        style="width:100%;padding:10px 12px 10px 36px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:14px;box-sizing:border-box;outline:none;">
+      <svg style="position:absolute;left:28px;top:50%;transform:translateY(-50%);opacity:0.4" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    `;
+    contentWrap.appendChild(searchWrap);
+
+    // Egzersiz listesi (arama sonuçları)
+    const listWrap = document.createElement('div');
+    listWrap.style.cssText = 'padding:0 16px 8px;display:flex;flex-direction:column;gap:4px;max-height:160px;overflow-y:auto;';
+    contentWrap.appendChild(listWrap);
 
     const chartWrap = document.createElement('div');
     chartWrap.style.cssText = 'padding:0 16px';
     contentWrap.appendChild(chartWrap);
+
+    function renderList(filter) {
+      listWrap.innerHTML = '';
+      const filtered = exercises.filter(ex =>
+        ex.name.toLowerCase().includes(filter.toLowerCase())
+      );
+      if (filtered.length === 0) {
+        listWrap.innerHTML = `<div style="font-size:12px;color:var(--text-muted);padding:8px 0">${lang === 'tr' ? 'Sonuç yok' : 'No results'}</div>`;
+        return;
+      }
+      filtered.forEach(ex => {
+        const realIdx = exercises.indexOf(ex);
+        const btn = document.createElement('button');
+        btn.style.cssText = `text-align:left;padding:8px 12px;border-radius:8px;border:none;cursor:pointer;font-size:13px;font-weight:500;transition:background 0.15s;background:${realIdx === selectedIdx ? 'var(--accent)' : 'var(--surface2)'};color:${realIdx === selectedIdx ? '#fff' : 'var(--text)'};`;
+        btn.textContent = ex.name;
+        btn.onclick = () => {
+          selectedIdx = realIdx;
+          renderList(document.getElementById('chartSearch')?.value || '');
+          drawChart(selectedIdx);
+        };
+        listWrap.appendChild(btn);
+      });
+    }
+
+    document.getElementById('chartSearch')?.addEventListener('input', e => {
+      renderList(e.target.value);
+    });
+
+    renderList('');
+    drawChart(0);
 
     function drawChart(exIdx) {
       chartWrap.innerHTML = '';
@@ -1939,9 +1976,6 @@ function renderProgressPanel() {
       chartWrap.appendChild(scrollWrap);
       requestAnimationFrame(() => { scrollWrap.scrollLeft = scrollWrap.scrollWidth; });
     }
-
-    drawChart(0);
-    sel.onchange = () => drawChart(parseInt(sel.value));
   }
 
   // ── PR TAB ──
