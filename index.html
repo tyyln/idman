@@ -1738,34 +1738,71 @@ function calcStreak() {
     return Object.values(hw.sets).some(s => s && s.done);
   }
 
-  const thisWeekActive = Object.values(sessionSets).some(s => s && s.done);
-  const allKeys = Object.keys(history).filter(k => k !== currentKey).sort();
+  function getWeekKeyFromDate(date) {
+    return getWeekKey(date);
+  }
 
-  // Mevcut streak: bu haftadan veya geçen haftadan geriye say
+  function prevWeekKey(key) {
+    const d = new Date(key);
+    d.setDate(d.getDate() - 7);
+    return getWeekKey(d);
+  }
+
+  const thisWeekActive = Object.values(sessionSets).some(s => s && s.done);
+
+  // Mevcut streak: bu haftadan geriye ardışık haftaları say
   let current = 0;
   if (thisWeekActive) {
     current = 1;
-    for (let i = allKeys.length - 1; i >= 0; i--) {
-      if (isWeekActive(allKeys[i])) current++;
-      else break;
+    let checkKey = prevWeekKey(currentKey);
+    while (isWeekActive(checkKey)) {
+      current++;
+      checkKey = prevWeekKey(checkKey);
     }
   } else {
-    // Bu hafta aktif değil — geçen haftadan itibaren ardışık say
-    for (let i = allKeys.length - 1; i >= 0; i--) {
-      if (isWeekActive(allKeys[i])) current++;
-      else break;
+    // Bu hafta aktif değil — geçen haftadan say
+    let checkKey = prevWeekKey(currentKey);
+    if (isWeekActive(checkKey)) {
+      current = 1;
+      checkKey = prevWeekKey(checkKey);
+      while (isWeekActive(checkKey)) {
+        current++;
+        checkKey = prevWeekKey(checkKey);
+      }
     }
   }
 
-  // Tüm zamanların rekoru
-  const allActiveKeys = [...allKeys, ...(thisWeekActive ? [currentKey] : [])];
+  // Tüm zamanların rekoru — tüm history'yi tara
+  const allKeys = Object.keys(history).sort();
   let best = 0, temp = 0;
-  // Sadece history key'lerini kullan
-  allKeys.forEach(key => {
-    if (isWeekActive(key)) { temp++; best = Math.max(best, temp); }
-    else temp = 0;
-  });
-  if (thisWeekActive) { temp++; best = Math.max(best, temp); }
+  for (let i = 0; i < allKeys.length; i++) {
+    if (isWeekActive(allKeys[i])) {
+      // Önceki haftayla ardışık mı?
+      if (i === 0) {
+        temp = 1;
+      } else {
+        const expected = prevWeekKey(allKeys[i]);
+        // Bir önceki key tam olarak bir hafta öncesiyse ardışık
+        if (allKeys[i - 1] === expected || isWeekActive(expected)) {
+          temp++;
+        } else {
+          temp = 1;
+        }
+      }
+      best = Math.max(best, temp);
+    } else {
+      temp = 0;
+    }
+  }
+  if (thisWeekActive) {
+    const lastHistKey = allKeys[allKeys.length - 1];
+    const expectedPrev = prevWeekKey(currentKey);
+    if (!lastHistKey || lastHistKey === expectedPrev || isWeekActive(expectedPrev)) {
+      best = Math.max(best, temp + 1);
+    } else {
+      best = Math.max(best, 1);
+    }
+  }
   best = Math.max(best, current);
 
   return { current, best };
