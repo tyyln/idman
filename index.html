@@ -1178,6 +1178,15 @@
       <label data-i18n="noteLabel"></label>
       <textarea id="editExNote" rows="2" data-i18n-placeholder="notePlaceholder" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:14px;font-family:inherit;resize:none;box-sizing:border-box;"></textarea>
     </div>
+    <div id="editSupersetRow" style="display:flex;align-items:flex-start;justify-content:space-between;padding:10px 0;border-top:1px solid var(--border-light);margin-top:16px">
+      <div>
+        <div style="font-size:13px;font-weight:600;color:var(--text)" data-i18n="supersetLabel"></div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:2px" data-i18n="supersetSub"></div>
+      </div>
+      <button id="editSupersetToggle" onclick="toggleSupersetEdit()" style="width:44px;height:26px;border-radius:13px;border:none;background:var(--border);cursor:pointer;position:relative;transition:background 0.2s;flex-shrink:0;margin-top:8px">
+        <span id="editSupersetThumb" style="position:absolute;left:2px;top:2px;width:22px;height:22px;border-radius:50%;background:#fff;transition:left 0.2s;box-shadow:0 1px 4px rgba(0,0,0,0.2)"></span>
+      </button>
+    </div>
     <button class="btn-primary" onclick="saveEditExercise()" data-i18n="save"></button>
     <button class="btn-cancel" onclick="closeEditExerciseModal()" data-i18n="cancel"></button>
   </div>
@@ -2838,21 +2847,84 @@ function openEditExerciseModal(ei) {
   document.getElementById('editExSets').value = ex.sets;
   document.getElementById('editExReps').value = ex.reps;
   document.getElementById('editExNote').value = ex.note || '';
+
+  // Superset toggle — en üstteki egzersizde gösterme
+  const hasPrev = ei > 0;
+  const ssRow = document.getElementById('editSupersetRow');
+  const tog = document.getElementById('editSupersetToggle');
+  const thumb = document.getElementById('editSupersetThumb');
+  if (ssRow) ssRow.style.display = hasPrev ? '' : 'none';
+  const isInSS = !!ex.ssGroup;
+  if (tog) tog.style.background = isInSS ? 'var(--accent)' : 'var(--border)';
+  if (thumb) thumb.style.left = isInSS ? '20px' : '2px';
+
   document.getElementById('editExerciseOverlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
 }
+
+let _editSupersetOn = false;
+function toggleSupersetEdit() {
+  const ex = state.days[activeDay].exercises[editingExerciseIdx];
+  _editSupersetOn = !ex.ssGroup;
+  const tog = document.getElementById('editSupersetToggle');
+  const thumb = document.getElementById('editSupersetThumb');
+  tog.style.background = _editSupersetOn ? 'var(--accent)' : 'var(--border)';
+  thumb.style.left = _editSupersetOn ? '20px' : '2px';
+  // Geçici olarak toggle state'i güncelle — save'de uygulanacak
+  ex._tempSupersetToggle = _editSupersetOn;
+}
+
 function closeEditExerciseModal() {
+  // Temp toggle temizle
+  if (editingExerciseIdx !== null) {
+    const ex = state.days[activeDay]?.exercises[editingExerciseIdx];
+    if (ex) delete ex._tempSupersetToggle;
+  }
   document.getElementById('editExerciseOverlay').classList.remove('open');
+  document.body.style.overflow = '';
   editingExerciseIdx = null;
 }
+
 function saveEditExercise() {
   if (editingExerciseIdx === null) return;
-  const ex = state.days[activeDay].exercises[editingExerciseIdx];
+  const exs = state.days[activeDay].exercises;
+  const ex = exs[editingExerciseIdx];
   const name = document.getElementById('editExName').value.trim();
   if (!name) { document.getElementById('editExName').focus(); return; }
   ex.name = name;
   ex.sets = parseInt(document.getElementById('editExSets').value) || ex.sets;
   ex.reps = document.getElementById('editExReps').value.trim() || ex.reps;
   ex.note = document.getElementById('editExNote').value.trim();
+
+  // Superset toggle uygula
+  if (editingExerciseIdx > 0) {
+    const wantSS = !!ex._tempSupersetToggle || (ex.ssGroup && ex._tempSupersetToggle !== false);
+    // Toggle değiştirildiyse
+    if (ex._tempSupersetToggle !== undefined) {
+      if (ex._tempSupersetToggle) {
+        // SS ekle — bir önceki egzersizle aynı gruba kat
+        const prev = exs[editingExerciseIdx - 1];
+        if (prev.ssGroup) {
+          ex.ssGroup = prev.ssGroup;
+        } else {
+          const newGroup = 'ss_' + Date.now();
+          prev.ssGroup = newGroup;
+          ex.ssGroup = newGroup;
+        }
+      } else {
+        // SS kaldır
+        const oldGroup = ex.ssGroup;
+        ex.ssGroup = null;
+        // Grup tek üye kaldıysa onu da temizle
+        if (oldGroup) {
+          const remaining = exs.filter(e => e.ssGroup === oldGroup);
+          if (remaining.length <= 1) remaining.forEach(e => { e.ssGroup = null; });
+        }
+      }
+    }
+    delete ex._tempSupersetToggle;
+  }
+
   saveState();
   closeEditExerciseModal();
   render();
@@ -3571,7 +3643,7 @@ function exportData() {
     exportedAt: new Date().toISOString(),
     state: state,
     history: history,
-    sessionSets: sessionSets,
+    sessionSets: { ...sessionSets, _weekKey: getCurrentWeekKey() },
     weightLog: loadWeightLog(),
   };
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
@@ -3594,10 +3666,19 @@ function importData(event) {
       // Restore all data
       state = backup.state;
       history = backup.history;
-      sessionSets = backup.sessionSets || {};
+      // sessionSets'i backup'tan yükle ama sadece mevcut haftanınkini al
+      const currentKey = getCurrentWeekKey();
+      const backupSessionWeekKey = backup.sessionSets?._weekKey;
+      if (backupSessionWeekKey === currentKey) {
+        sessionSets = backup.sessionSets || {};
+      } else {
+        // Farklı hafta — session'ı sıfırla
+        sessionSets = {};
+      }
       if (backup.weightLog) {
         try { localStorage.setItem(WEIGHT_KEY, JSON.stringify(backup.weightLog)); } catch(err) {}
       }
+      activeDay = getTodayIndex();
       saveState();
       try { localStorage.setItem(HISTORY_KEY, JSON.stringify(history)); } catch(err) {}
       saveSession();
@@ -3621,8 +3702,7 @@ function toggleTheme() {
 (function() {
   try {
     const saved = localStorage.getItem('antrenman_theme');
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    applyTheme(saved ? saved === 'dark' : prefersDark);
+    applyTheme(saved ? saved === 'dark' : false);
   } catch(e) { applyTheme(false); }
 })();
 
