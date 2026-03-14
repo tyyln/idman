@@ -1959,13 +1959,13 @@ function renderProgressPanel() {
       const W = Math.max(300, dataPoints.length * (BAR_W + BAR_GAP) + pad * 2);
 
       const scrollWrap = document.createElement('div');
-      scrollWrap.style.cssText = 'overflow-x:auto;-webkit-overflow-scrolling:touch;margin-top:8px;padding-bottom:4px';
+      scrollWrap.style.cssText = 'overflow-x:auto;-webkit-overflow-scrolling:touch;margin-top:8px;padding-bottom:50px';
 
       const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-      svg.setAttribute('viewBox', `0 0 ${W} ${H + 90}`);
+      svg.setAttribute('viewBox', `0 0 ${W} ${H + 50}`);
       svg.setAttribute('width', W);
-      svg.setAttribute('height', H + 90);
-      svg.style.cssText = 'display:block;min-width:100%';
+      svg.setAttribute('height', H + 50);
+      svg.style.cssText = 'display:block;min-width:100%;overflow:visible';
 
       dataPoints.forEach((d, i) => {
         const x = pad + i * (BAR_W + BAR_GAP);
