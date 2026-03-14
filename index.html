@@ -1569,7 +1569,8 @@ function saveHistory() {
 
 // Save current week session when switching or closing
 function saveCurrentWeekToHistory() {
-  if (Object.keys(sessionSets).length === 0) return;
+  const doneSets = Object.values(sessionSets).filter(s => s?.done);
+  if (doneSets.length === 0) return; // Hiç tamamlanmış set yoksa kaydetme
   const weekKey = getCurrentWeekKey();
   if (!history[weekKey]) {
     // First save this week: snapshot both sets and days
@@ -2266,11 +2267,6 @@ function renderWeightPanel() {
       circle.setAttribute('cx', x); circle.setAttribute('cy', y);
       circle.setAttribute('r', 4); circle.setAttribute('fill', 'var(--accent)');
       svg.appendChild(circle);
-      const val = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      val.setAttribute('x', x); val.setAttribute('y', y - 8);
-      val.setAttribute('text-anchor', 'middle');
-      val.setAttribute('font-size', '9'); val.setAttribute('fill', 'var(--text-secondary)');
-      val.textContent = displayWeight(d.kg); svg.appendChild(val);
       const lbl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
       lbl.setAttribute('x', x); lbl.setAttribute('y', H + 14);
       lbl.setAttribute('text-anchor', 'middle');
@@ -3995,14 +3991,16 @@ function toggleWorkout() {
 }
 
 function calcWorkoutStats() {
-  const day = state.days[activeDay];
+  const isReadonly = viewingWeek !== null;
+  const day = isReadonly ? (history[viewingWeek]?.days || state.days)[activeDay] : state.days[activeDay];
+  const sets = isReadonly ? (history[viewingWeek]?.sets || {}) : sessionSets;
   if (!day) return { done: 0, total: 0, volume: 0, exercises: 0 };
   let done = 0, total = 0, volume = 0, exercises = 0;
   day.exercises.forEach((ex, ei) => {
     let exDone = 0;
     for (let si = 0; si < ex.sets; si++) {
       total++;
-      const s = sessionSets[`${activeDay}-${ei}-${si}`];
+      const s = sets[`${activeDay}-${ei}-${si}`];
       if (s && s.done) {
         done++;
         exDone++;
