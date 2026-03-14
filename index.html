@@ -863,7 +863,7 @@
     gap: 2px;
   }
   .unit-toggle-btn {
-    padding: 6px 18px;
+    padding: 6px 0;
     border-radius: 8px;
     border: none;
     background: transparent;
@@ -873,6 +873,9 @@
     cursor: pointer;
     transition: all 0.18s;
     font-family: -apple-system, 'SF Pro Text', sans-serif;
+    flex: 1;
+    text-align: center;
+    min-width: 48px;
   }
   .unit-toggle-btn.active {
     background: var(--surface);
@@ -962,7 +965,7 @@
 <div class="left-col">
   <button class="left-col-btn" id="navBtnHistory" onclick="openPanel('history')" title="Hafta Geçmişi"></button>
   <button class="left-col-btn" id="navBtnProgress" onclick="openPanel('progress')" title="Grafik"></button>
-  <button class="left-col-btn" id="navBtnWeight" onclick="openPanel('weight')" title="Vücut Ağırlığı"></button>
+  <button class="left-col-btn" id="navBtnWeight" onclick="openPanel('weight')" title="Ölçümler"></button>
   <div class="left-col-spacer"></div>
   <button class="left-col-btn" id="settingsBtn" onclick="openSettings()" title="Ayarlar" style="margin-bottom:16px;"></button>
 </div>
@@ -980,6 +983,16 @@
       <div class="unit-toggle">
         <button class="unit-toggle-btn active" id="unitKgBtn" onclick="setWeightUnit('kg')">kg</button>
         <button class="unit-toggle-btn" id="unitLbsBtn" onclick="setWeightUnit('lbs')">lbs</button>
+      </div>
+    </div>
+    <div class="settings-row">
+      <div>
+        <div class="settings-row-label" data-i18n="lengthUnit"></div>
+        <div class="settings-row-sub" data-i18n="lengthUnitSub"></div>
+      </div>
+      <div class="unit-toggle">
+        <button class="unit-toggle-btn active" id="unitCmBtn" onclick="setLengthUnit('cm')">cm</button>
+        <button class="unit-toggle-btn" id="unitInBtn" onclick="setLengthUnit('in')">in</button>
       </div>
     </div>
     <div class="settings-row">
@@ -1099,6 +1112,16 @@
   </div>
 </div>
 
+<!-- Copy Day Modal -->
+<div class="overlay" id="copyDayOverlay">
+  <div class="modal">
+    <div class="settings-sheet-handle" style="margin-bottom:16px"></div>
+    <h2 id="copyDayTitle"></h2>
+    <div id="copyDayBtns" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px"></div>
+    <button class="btn-cancel" onclick="closeCopyDayModal()" data-i18n="cancel"></button>
+  </div>
+</div>
+
 <!-- Edit Day Modal -->
 <div class="overlay" id="editDayOverlay">
   <div class="modal">
@@ -1200,6 +1223,8 @@ const I18N = {
     settings: 'Ayarlar',
     weightUnit: 'Ağırlık Birimi',
     weightUnitSub: 'Egzersizlerdeki ağırlık gösterimi',
+    lengthUnit: 'Uzunluk Birimi',
+    lengthUnitSub: 'Ölçümlerdeki uzunluk gösterimi',
     language: 'Dil',
     languageSub: 'Uygulama dilini değiştir',
     accentColor: 'Renk Teması',
@@ -1259,7 +1284,7 @@ const I18N = {
     progressPanel: 'İlerleme Grafiği',
     progressChartTab: 'Grafik',
     progressPRTab: 'PR',
-    weightPanel: 'Vücut Ağırlığı',
+    weightPanel: 'Ölçümler',
     selectExercise: 'Egzersiz seç',
     noDataYet: 'Henüz veri yok.',
     weightLog: 'Ağırlık Kaydı',
@@ -1288,6 +1313,8 @@ const I18N = {
     settings: 'Settings',
     weightUnit: 'Weight Unit',
     weightUnitSub: 'Weight display in exercises',
+    lengthUnit: 'Length Unit',
+    lengthUnitSub: 'Length display in measurements',
     language: 'Language',
     languageSub: 'Change app language',
     accentColor: 'Color Theme',
@@ -1347,7 +1374,7 @@ const I18N = {
     progressPanel: 'Progress Chart',
     progressChartTab: 'Chart',
     progressPRTab: 'PR',
-    weightPanel: 'Body Weight',
+    weightPanel: 'Measurements',
     selectExercise: 'Select exercise',
     noDataYet: 'No data yet.',
     weightLog: 'Weight Log',
@@ -1397,11 +1424,25 @@ function applyI18n() {
   }
 }
 
+function refreshActivePanel() {
+  if (!activePanel) return;
+  // Başlığı güncelle
+  const titleEl = document.getElementById('sidebarTitle');
+  if (titleEl) {
+    const iconSvg = ICONS[activePanel] || '';
+    titleEl.innerHTML = `<span style="display:inline-flex;align-items:center;gap:8px;vertical-align:middle">${iconSvg} ${t(activePanel + 'Panel')}</span>`;
+  }
+  if (activePanel === 'history') renderSidebar();
+  else if (activePanel === 'progress') renderProgressPanel();
+  else if (activePanel === 'weight') renderWeightPanel();
+}
+
 function setLanguage(l) {
   lang = l;
   try { localStorage.setItem('antrenman_lang', l); } catch(e) {}
   render();
   applyI18n();
+  refreshActivePanel();
 }
 
 const STORAGE_KEY = 'antrenman_v2';
@@ -1661,9 +1702,77 @@ function renderSidebar() {
 }
 
 // ── PROGRESS PANEL ──
+function calcStreak() {
+  const currentKey = getCurrentWeekKey();
+  // Haftanın aktif olup olmadığını kontrol et
+  function isWeekActive(key) {
+    const hw = history[key];
+    if (!hw || !hw.sets) return false;
+    return Object.values(hw.sets).some(s => s && s.done);
+  }
+  // Bu hafta aktif mi?
+  const thisWeekActive = Object.values(sessionSets).some(s => s && s.done);
+
+  // Tüm hafta key'lerini sırala
+  const allKeys = Object.keys(history).filter(k => k !== currentKey).sort();
+
+  // Mevcut streak — bu haftadan geriye say
+  let current = thisWeekActive ? 1 : 0;
+  if (allKeys.length > 0) {
+    // Geçen haftadan başla geriye git
+    const startIdx = current > 0 ? allKeys.length - 1 : allKeys.length - 1;
+    for (let i = startIdx; i >= 0; i--) {
+      if (isWeekActive(allKeys[i])) current++;
+      else break;
+    }
+    if (!thisWeekActive) current = 0; // Bu hafta aktif değilse geçmişe bakmaya gerek yok
+  }
+
+  // Tüm zamanların rekoru
+  let best = 0, temp = 0;
+  allKeys.forEach(key => {
+    if (isWeekActive(key)) { temp++; best = Math.max(best, temp); }
+    else temp = 0;
+  });
+  if (thisWeekActive) {
+    temp++;
+    best = Math.max(best, temp);
+  }
+  // Mevcut streak rekordan büyük olamaz
+  best = Math.max(best, current);
+
+  return { current, best };
+}
+
 function renderProgressPanel() {
   const body = document.getElementById('sidebarBody');
   body.innerHTML = '';
+
+  // ── STREAK KARTI ──
+  const { current, best } = calcStreak();
+  const streakCard = document.createElement('div');
+  streakCard.style.cssText = 'display:flex;gap:0;margin:14px 16px 8px;border-radius:14px;overflow:hidden;border:1px solid var(--border-light);';
+
+  const fireEmoji = current > 0 ? '🔥' : '💤';
+  streakCard.innerHTML = `
+    <div style="flex:1;padding:14px 16px;border-right:1px solid var(--border-light)">
+      <div style="font-size:11px;font-weight:600;color:var(--text-secondary);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px">${lang === 'tr' ? 'Mevcut Seri' : 'Current Streak'}</div>
+      <div style="display:flex;align-items:baseline;gap:6px">
+        <span style="font-size:28px;font-weight:700;color:${current > 0 ? 'var(--accent)' : 'var(--text-muted)'}">${current}</span>
+        <span style="font-size:13px;color:var(--text-secondary)">${lang === 'tr' ? 'hafta' : 'week(s)'}</span>
+        <span style="font-size:20px;margin-left:2px">${fireEmoji}</span>
+      </div>
+    </div>
+    <div style="flex:1;padding:14px 16px">
+      <div style="font-size:11px;font-weight:600;color:var(--text-secondary);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px">${lang === 'tr' ? 'En İyi Seri' : 'Best Streak'}</div>
+      <div style="display:flex;align-items:baseline;gap:6px">
+        <span style="font-size:28px;font-weight:700;color:var(--text)">${best}</span>
+        <span style="font-size:13px;color:var(--text-secondary)">${lang === 'tr' ? 'hafta' : 'week(s)'}</span>
+        <span style="font-size:20px;margin-left:2px">🏆</span>
+      </div>
+    </div>
+  `;
+  body.appendChild(streakCard);
 
   // ── TABS ──
   const tabBar = document.createElement('div');
@@ -1794,7 +1903,7 @@ function renderProgressPanel() {
         val.setAttribute('x', x + BAR_W / 2); val.setAttribute('y', y - 5);
         val.setAttribute('text-anchor', 'middle');
         val.setAttribute('font-size', '10'); val.setAttribute('fill', 'var(--text-secondary)');
-        val.textContent = d.kg + weightUnit;
+        val.textContent = displayWeight(d.kg) + weightUnit;
         svg.appendChild(val);
 
         const lbl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
@@ -1928,115 +2037,333 @@ function saveWeightLog(log) {
   try { localStorage.setItem(WEIGHT_KEY, JSON.stringify(log)); } catch(e) {}
 }
 
+const BIO_KEY = 'antrenman_biometrics_v1';
+const BIO_METRICS = [
+  { id: 'height',   unit: () => lengthUnit,  tr: 'Boy',             en: 'Height',    once: true  },
+  { id: 'bodyfat',  unit: () => '%',         tr: 'Vücut Yağ Oranı', en: 'Body Fat',  once: false },
+  { id: 'waist',    unit: () => lengthUnit,  tr: 'Bel Çevresi',     en: 'Waist',     once: false },
+  { id: 'shoulder', unit: () => lengthUnit,  tr: 'Omuz Genişliği',  en: 'Shoulders', once: false },
+  { id: 'arm',      unit: () => lengthUnit,  tr: 'Kol Çevresi',     en: 'Arm',       once: false },
+  { id: 'chest',    unit: () => lengthUnit,  tr: 'Göğüs Çevresi',   en: 'Chest',     once: false },
+  { id: 'hip',      unit: () => lengthUnit,  tr: 'Kalça Çevresi',   en: 'Hip',       once: false },
+  { id: 'thigh',    unit: () => lengthUnit,  tr: 'Uyluk Çevresi',   en: 'Thigh',     once: false },
+];
+
+function loadBioLog() {
+  try { return JSON.parse(localStorage.getItem(BIO_KEY) || '{}'); } catch(e) { return {}; }
+}
+function saveBioLog(log) {
+  try { localStorage.setItem(BIO_KEY, JSON.stringify(log)); } catch(e) {}
+}
+
 function renderWeightPanel() {
   const body = document.getElementById('sidebarBody');
   body.innerHTML = '';
-  const log = loadWeightLog();
 
-  // Input row
-  const inputRow = document.createElement('div');
-  inputRow.style.cssText = 'display:flex;gap:8px;padding:16px;align-items:center';
-  inputRow.innerHTML = `
-    <style>#weightInput::-webkit-outer-spin-button,#weightInput::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}#weightInput{-moz-appearance:textfield}</style>
-    <input id="weightInput" type="number" inputmode="decimal" step="0.1" min="0"
-      placeholder="${t('weightPlaceholder')}"
-      style="flex:1;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:15px;">
-    <span style="color:var(--text-secondary);font-size:13px">${weightUnit}</span>
-    <button onclick="addWeightEntry()" style="padding:10px 16px;border-radius:10px;border:none;background:var(--accent);color:#fff;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">${t('addWeight')}</button>
-  `;
-  body.appendChild(inputRow);
+  // ── BMI KARTI ──
+  const bioLog = loadBioLog();
+  const weightLog = loadWeightLog();
+  const latestWeight = weightLog.length > 0 ? [...weightLog].sort((a,b) => b.date.localeCompare(a.date))[0].kg : null;
+  const heightEntries = bioLog['height'] || [];
+  const latestHeight = heightEntries.length > 0 ? heightEntries[heightEntries.length - 1].val : null;
 
-  if (log.length === 0) {
-    const empty = document.createElement('div');
-    empty.style.cssText = 'padding:20px;text-align:center;color:var(--text-muted);font-size:13px';
-    empty.textContent = t('noWeightData');
-    body.appendChild(empty);
-    return;
-  }
+  const bmiCard = document.createElement('div');
+  bmiCard.style.cssText = 'margin:14px 16px 4px;border-radius:14px;overflow:hidden;border:1px solid var(--border-light);';
 
-  // Line chart — scrollable with fixed spacing
-  const allSorted = [...log].sort((a, b) => a.date.localeCompare(b.date));
-  const PT_GAP = 44, H = 130, pad = 20;
-  const W = Math.max(300, (allSorted.length - 1) * PT_GAP + pad * 2);
-  const maxV = Math.max(...allSorted.map(d => d.kg));
-  const minV = Math.min(...allSorted.map(d => d.kg));
-  const range = maxV - minV || 1;
+  if (latestWeight && latestHeight) {
+    const heightM = latestHeight / 100;
+    const bmi = Math.round((latestWeight / (heightM * heightM)) * 10) / 10;
+    let category, color;
+    if (bmi < 18.5)      { category = lang === 'tr' ? 'Zayıf'          : 'Underweight'; color = '#5ac8fa'; }
+    else if (bmi < 25)   { category = lang === 'tr' ? 'Normal'         : 'Normal';      color = '#34c759'; }
+    else if (bmi < 30)   { category = lang === 'tr' ? 'Fazla Kilolu'   : 'Overweight';  color = '#ff9500'; }
+    else                 { category = lang === 'tr' ? 'Obez'           : 'Obese';       color = '#ff3b30'; }
 
-  const scrollWrap = document.createElement('div');
-  scrollWrap.style.cssText = 'overflow-x:auto;-webkit-overflow-scrolling:touch;margin:8px 0 16px;padding-bottom:4px';
+    // BMI bar pozisyonu (10-40 arası)
+    const pct = Math.min(100, Math.max(0, ((bmi - 10) / 30) * 100));
 
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('width', W);
-  svg.setAttribute('height', H + 20);
-  svg.style.cssText = 'display:block;min-width:100%';
-
-  if (allSorted.length > 1) {
-    const points = allSorted.map((d, i) => {
-      const x = pad + i * PT_GAP;
-      const y = H - ((d.kg - minV) / range) * (H - 20) - 10;
-      return `${x},${y}`;
-    }).join(' ');
-    const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
-    poly.setAttribute('points', points);
-    poly.setAttribute('fill', 'none');
-    poly.setAttribute('stroke', 'var(--accent)');
-    poly.setAttribute('stroke-width', '2.5');
-    poly.setAttribute('stroke-linecap', 'round');
-    poly.setAttribute('stroke-linejoin', 'round');
-    svg.appendChild(poly);
-  }
-  allSorted.forEach((d, i) => {
-    const x = allSorted.length > 1 ? pad + i * PT_GAP : W / 2;
-    const y = H - ((d.kg - minV) / range) * (H - 20) - 10;
-
-    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    circle.setAttribute('cx', x); circle.setAttribute('cy', y);
-    circle.setAttribute('r', 4); circle.setAttribute('fill', 'var(--accent)');
-    svg.appendChild(circle);
-
-    const val = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    val.setAttribute('x', x); val.setAttribute('y', y - 8);
-    val.setAttribute('text-anchor', 'middle');
-    val.setAttribute('font-size', '9'); val.setAttribute('fill', 'var(--text-secondary)');
-    val.textContent = d.kg;
-    svg.appendChild(val);
-
-    const lbl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    lbl.setAttribute('x', x); lbl.setAttribute('y', H + 14);
-    lbl.setAttribute('text-anchor', 'middle');
-    lbl.setAttribute('font-size', '9'); lbl.setAttribute('fill', 'var(--text-muted)');
-    lbl.textContent = d.date.slice(5); // MM-DD
-    svg.appendChild(lbl);
-  });
-  scrollWrap.appendChild(svg);
-  body.appendChild(scrollWrap);
-  requestAnimationFrame(() => { scrollWrap.scrollLeft = scrollWrap.scrollWidth; });
-
-  // Log list
-  const listWrap = document.createElement('div');
-  listWrap.style.cssText = 'display:flex;flex-direction:column;gap:6px;margin-top:4px;padding:0 16px 16px';
-  [...log].sort((a, b) => b.date.localeCompare(a.date)).forEach((entry, i) => {
-    const row = document.createElement('div');
-    row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--surface2);border-radius:10px';
-    row.innerHTML = `
-      <span style="font-size:13px;color:var(--text-secondary)">${entry.date}</span>
-      <span style="font-size:15px;font-weight:600;color:var(--text)">${entry.kg} ${weightUnit}</span>
-      <button onclick="deleteWeightEntry(${i})" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:16px;padding:0 4px">✕</button>
+    bmiCard.innerHTML = `
+      <div style="padding:14px 16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <div>
+            <div style="font-size:11px;font-weight:600;color:var(--text-secondary);letter-spacing:0.5px;text-transform:uppercase">BMI</div>
+            <div style="display:flex;align-items:baseline;gap:6px;margin-top:2px">
+              <span style="font-size:28px;font-weight:700;color:${color}">${bmi}</span>
+              <span style="font-size:13px;font-weight:600;color:${color}">${category}</span>
+            </div>
+          </div>
+          <div style="text-align:right;font-size:11px;color:var(--text-muted);line-height:1.6">
+            <div>${displayWeight(latestWeight)} ${weightUnit}</div>
+            <div>${lengthUnit === 'in' ? (() => { const ft = Math.floor(latestHeight/2.54/12); const inch = Math.round(latestHeight/2.54 % 12); return `${ft}'${inch}"`; })() : `${latestHeight} cm`}</div>
+          </div>
+        </div>
+        <div style="height:6px;border-radius:3px;background:linear-gradient(to right,#5ac8fa 0%,#34c759 30%,#ff9500 60%,#ff3b30 100%);position:relative">
+          <div style="position:absolute;top:-3px;width:12px;height:12px;border-radius:50%;background:#fff;border:2px solid ${color};box-shadow:0 1px 4px rgba(0,0,0,0.2);left:calc(${pct}% - 6px)"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:4px;font-size:10px;color:var(--text-muted)">
+          <span>10</span><span>18.5</span><span>25</span><span>30</span><span>40</span>
+        </div>
+      </div>
     `;
-    listWrap.appendChild(row);
-  });
-  body.appendChild(listWrap);
+  } else {
+    bmiCard.innerHTML = `
+      <div style="padding:14px 16px;display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div style="font-size:11px;font-weight:600;color:var(--text-secondary);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:4px">BMI</div>
+          <div style="font-size:13px;color:var(--text-muted)">${lang === 'tr' ? 'Boy ve ağırlık girince hesaplanır' : 'Enter height & weight to calculate'}</div>
+        </div>
+        <span style="font-size:24px">⚖️</span>
+      </div>
+    `;
+  }
+  body.appendChild(bmiCard);
+
+  // ── TABS ──
+  const tabBar = document.createElement('div');
+  tabBar.style.cssText = 'display:flex;gap:4px;padding:12px 16px 0;border-bottom:1px solid var(--border-light);margin-bottom:4px;';
+
+  let activeTab = 'weight';
+  const contentWrap = document.createElement('div');
+
+  function makeTab(id, label) {
+    const btn = document.createElement('button');
+    btn.dataset.tab = id;
+    btn.textContent = label;
+    btn.style.cssText = `padding:12px 24px;border:none;background:none;cursor:pointer;font-size:15px;font-weight:600;border-bottom:2px solid transparent;margin-bottom:-1px;color:var(--text-secondary);transition:color 0.15s,border-color 0.15s;border-radius:0;flex:1;text-align:center;`;
+    btn.onclick = () => {
+      activeTab = id;
+      tabBar.querySelectorAll('button').forEach(b => {
+        const isActive = b.dataset.tab === id;
+        b.style.color = isActive ? 'var(--accent)' : 'var(--text-secondary)';
+        b.style.borderBottomColor = isActive ? 'var(--accent)' : 'transparent';
+      });
+      contentWrap.innerHTML = '';
+      if (id === 'weight') drawWeightTab();
+      else drawBioTab();
+    };
+    return btn;
+  }
+
+  const weightTab = makeTab('weight', lang === 'tr' ? 'Ağırlık' : 'Weight');
+  const bioTab = makeTab('bio', lang === 'tr' ? 'Ölçümler' : 'Metrics');
+  weightTab.style.color = 'var(--accent)';
+  weightTab.style.borderBottomColor = 'var(--accent)';
+  tabBar.appendChild(weightTab);
+  tabBar.appendChild(bioTab);
+  body.appendChild(tabBar);
+  body.appendChild(contentWrap);
+
+  // ── WEIGHT TAB ──
+  function drawWeightTab() {
+    const log = loadWeightLog();
+
+    const inputRow = document.createElement('div');
+    inputRow.style.cssText = 'display:flex;gap:8px;padding:16px;align-items:center';
+    inputRow.innerHTML = `
+      <style>#weightInput::-webkit-outer-spin-button,#weightInput::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}#weightInput{-moz-appearance:textfield}</style>
+      <input id="weightInput" type="number" inputmode="decimal" step="0.1" min="0"
+        placeholder="${t('weightPlaceholder')}"
+        style="flex:1;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:15px;">
+      <span style="color:var(--text-secondary);font-size:13px">${weightUnit}</span>
+      <button onclick="addWeightEntry()" style="padding:10px 16px;border-radius:10px;border:none;background:var(--accent);color:#fff;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">${t('addWeight')}</button>
+    `;
+    contentWrap.appendChild(inputRow);
+
+    if (log.length === 0) {
+      const empty = document.createElement('div');
+      empty.style.cssText = 'padding:20px;text-align:center;color:var(--text-muted);font-size:13px';
+      empty.textContent = t('noWeightData');
+      contentWrap.appendChild(empty);
+      return;
+    }
+
+    const allSorted = [...log].sort((a, b) => a.date.localeCompare(b.date));
+    const PT_GAP = 44, H = 130, pad = 20;
+    const W = Math.max(300, (allSorted.length - 1) * PT_GAP + pad * 2);
+    const maxV = Math.max(...allSorted.map(d => d.kg));
+    const minV = Math.min(...allSorted.map(d => d.kg));
+    const range = maxV - minV || 1;
+
+    const scrollWrap = document.createElement('div');
+    scrollWrap.style.cssText = 'overflow-x:auto;-webkit-overflow-scrolling:touch;margin:8px 0 16px;padding-bottom:4px';
+
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('width', W); svg.setAttribute('height', H + 20);
+    svg.style.cssText = 'display:block;min-width:100%';
+
+    if (allSorted.length > 1) {
+      const points = allSorted.map((d, i) => {
+        const x = pad + i * PT_GAP;
+        const y = H - ((d.kg - minV) / range) * (H - 20) - 10;
+        return `${x},${y}`;
+      }).join(' ');
+      const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+      poly.setAttribute('points', points); poly.setAttribute('fill', 'none');
+      poly.setAttribute('stroke', 'var(--accent)'); poly.setAttribute('stroke-width', '2.5');
+      poly.setAttribute('stroke-linecap', 'round'); poly.setAttribute('stroke-linejoin', 'round');
+      svg.appendChild(poly);
+    }
+    allSorted.forEach((d, i) => {
+      const x = allSorted.length > 1 ? pad + i * PT_GAP : W / 2;
+      const y = H - ((d.kg - minV) / range) * (H - 20) - 10;
+      const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      circle.setAttribute('cx', x); circle.setAttribute('cy', y);
+      circle.setAttribute('r', 4); circle.setAttribute('fill', 'var(--accent)');
+      svg.appendChild(circle);
+      const val = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      val.setAttribute('x', x); val.setAttribute('y', y - 8);
+      val.setAttribute('text-anchor', 'middle');
+      val.setAttribute('font-size', '9'); val.setAttribute('fill', 'var(--text-secondary)');
+      val.textContent = displayWeight(d.kg); svg.appendChild(val);
+      const lbl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      lbl.setAttribute('x', x); lbl.setAttribute('y', H + 14);
+      lbl.setAttribute('text-anchor', 'middle');
+      lbl.setAttribute('font-size', '9'); lbl.setAttribute('fill', 'var(--text-muted)');
+      lbl.textContent = d.date.slice(5); svg.appendChild(lbl);
+    });
+    scrollWrap.appendChild(svg);
+    contentWrap.appendChild(scrollWrap);
+    requestAnimationFrame(() => { scrollWrap.scrollLeft = scrollWrap.scrollWidth; });
+
+    const listWrap = document.createElement('div');
+    listWrap.style.cssText = 'display:flex;flex-direction:column;gap:6px;margin-top:4px;padding:0 16px 16px';
+    [...log].sort((a, b) => b.date.localeCompare(a.date)).forEach((entry, i) => {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--surface2);border-radius:10px';
+      row.innerHTML = `
+        <span style="font-size:13px;color:var(--text-secondary)">${entry.date}</span>
+        <span style="font-size:15px;font-weight:600;color:var(--text)">${displayWeight(entry.kg)} ${weightUnit}</span>
+        <button onclick="deleteWeightEntry(${i})" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:16px;padding:0 4px">✕</button>
+      `;
+      listWrap.appendChild(row);
+    });
+    contentWrap.appendChild(listWrap);
+  }
+
+  // ── BIO TAB ──
+  function drawBioTab() {
+    const bioLog = loadBioLog();
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'padding:12px 16px;display:grid;grid-template-columns:1fr 1fr;gap:10px;';
+
+    function cmToFtIn(cm) {
+      const totalIn = cm / 2.54;
+      const ft = Math.floor(totalIn / 12);
+      const inch = Math.round(totalIn % 12);
+      return { ft, inch };
+    }
+
+    BIO_METRICS.forEach(metric => {
+      const entries = bioLog[metric.id] || [];
+      const latest = entries.length > 0 ? entries[entries.length - 1] : null;
+      const isHeightInInches = metric.id === 'height' && lengthUnit === 'in';
+
+      let latestDisplay = '', latestNum = '', latestUnit = metric.unit();
+      if (latest) {
+        if (isHeightInInches) {
+          const { ft, inch } = cmToFtIn(latest.val);
+          latestNum = `${ft}'${inch}"`;
+          latestUnit = '';
+        } else {
+          latestNum = latest.val;
+        }
+      }
+
+      const card = document.createElement('div');
+      card.style.cssText = 'background:var(--surface2);border-radius:12px;padding:12px 12px 10px;display:flex;flex-direction:column;gap:8px;position:relative;';
+
+      // Sıfırlama butonu — değer varsa göster
+      if (latest) {
+        const resetBtn = document.createElement('button');
+        resetBtn.innerHTML = '✕';
+        resetBtn.style.cssText = 'position:absolute;top:8px;right:8px;background:none;border:none;color:var(--text-muted);font-size:12px;cursor:pointer;padding:2px 4px;line-height:1;';
+        resetBtn.onclick = () => deleteBioEntry(metric.id);
+        card.appendChild(resetBtn);
+      }
+
+      // Başlık + değer
+      const top = document.createElement('div');
+      top.innerHTML = `
+        <div style="font-size:11px;color:var(--text-secondary);font-weight:500;margin-bottom:5px">${lang === 'tr' ? metric.tr : metric.en}</div>
+        <div style="display:flex;align-items:baseline;gap:4px">
+          ${latest
+            ? `<span style="font-size:20px;font-weight:700;color:var(--accent);line-height:1">${latestNum}</span>
+               ${latestUnit ? `<span style="font-size:12px;color:var(--text-secondary)">${latestUnit}</span>` : ''}`
+            : `<span style="font-size:16px;color:var(--text-muted)">—</span>`
+          }
+        </div>
+      `;
+      card.appendChild(top);
+
+      // Input
+      const inputWrap = document.createElement('div');
+      if (isHeightInInches) {
+        const latestFt = latest ? cmToFtIn(latest.val).ft : '';
+        const latestIn = latest ? cmToFtIn(latest.val).inch : '';
+        inputWrap.style.cssText = 'display:flex;gap:4px;align-items:center';
+        inputWrap.innerHTML = `
+          <style>#bio-height-ft::-webkit-outer-spin-button,#bio-height-ft::-webkit-inner-spin-button,#bio-height-in::-webkit-outer-spin-button,#bio-height-in::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}</style>
+          <input id="bio-height-ft" type="number" inputmode="numeric" min="0" max="8" placeholder="${latestFt || 'ft'}"
+            style="width:38px;padding:7px 6px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;-webkit-appearance:none;-moz-appearance:textfield;text-align:center;box-sizing:border-box">
+          <span style="font-size:11px;color:var(--text-secondary)">'</span>
+          <input id="bio-height-in" type="number" inputmode="decimal" min="0" max="11.9" step="0.1" placeholder="${latestIn || 'in'}"
+            style="width:38px;padding:7px 6px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;-webkit-appearance:none;-moz-appearance:textfield;text-align:center;box-sizing:border-box">
+          <span style="font-size:11px;color:var(--text-secondary)">"</span>
+          <button onclick="addBioEntryFtIn()" style="flex:1;padding:7px 4px;border-radius:8px;border:none;background:var(--accent);color:#fff;font-size:11px;font-weight:600;cursor:pointer">${lang === 'tr' ? 'Kay.' : 'Save'}</button>
+        `;
+      } else {
+        inputWrap.style.cssText = 'display:flex;gap:5px;align-items:center';
+        inputWrap.innerHTML = `
+          <style>#bio-${metric.id}::-webkit-outer-spin-button,#bio-${metric.id}::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}</style>
+          <input id="bio-${metric.id}" type="number" inputmode="decimal" step="0.1" min="0"
+            placeholder="${latest ? latest.val : metric.unit()}"
+            style="flex:1;padding:7px 8px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;-webkit-appearance:none;-moz-appearance:textfield;min-width:0;box-sizing:border-box">
+          <button onclick="addBioEntry('${metric.id}')" style="padding:7px 8px;border-radius:8px;border:none;background:var(--accent);color:#fff;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap">${lang === 'tr' ? 'Kay.' : 'Save'}</button>
+        `;
+      }
+      card.appendChild(inputWrap);
+
+      // Geçmiş — son 2 kayıt
+      if (entries.length > 1) {
+        const hist = document.createElement('div');
+        hist.style.cssText = 'display:flex;flex-direction:column;gap:3px;border-top:1px solid var(--border-light);padding-top:6px;margin-top:2px';
+        [...entries].reverse().slice(1, 3).forEach(e => {
+          const row = document.createElement('div');
+          row.style.cssText = 'display:flex;justify-content:space-between;font-size:10px;color:var(--text-muted)';
+          const displayVal = isHeightInInches
+            ? (() => { const {ft,inch} = cmToFtIn(e.val); return `${ft}'${inch}"`; })()
+            : `${e.val} ${metric.unit()}`;
+          row.innerHTML = `<span>${e.date.slice(5)}</span><span>${displayVal}</span>`;
+          hist.appendChild(row);
+        });
+        card.appendChild(hist);
+      }
+
+      wrap.appendChild(card);
+    });
+
+    contentWrap.appendChild(wrap);
+  }
+
+  drawWeightTab();
+}
+
+// kg değerini aktif birime göre gösterim için çevir
+function displayWeight(kg) {
+  if (weightUnit === 'lbs') return Math.round(kg * 2.20462 * 10) / 10;
+  return kg;
 }
 
 function addWeightEntry() {
   const val = parseFloat(document.getElementById('weightInput')?.value);
   if (!val || val <= 0) return;
+  // Her zaman kg olarak sakla
+  const kg = weightUnit === 'lbs' ? Math.round(val / 2.20462 * 100) / 100 : val;
   const log = loadWeightLog();
   const today = new Date().toISOString().slice(0, 10);
-  // Update if same day exists
   const existing = log.findIndex(e => e.date === today);
-  if (existing >= 0) log[existing].kg = val;
-  else log.push({ date: today, kg: val });
+  if (existing >= 0) log[existing].kg = kg;
+  else log.push({ date: today, kg });
   saveWeightLog(log);
   renderWeightPanel();
 }
@@ -2049,6 +2376,58 @@ function deleteWeightEntry(idx) {
   if (realIdx >= 0) log.splice(realIdx, 1);
   saveWeightLog(log);
   renderWeightPanel();
+}
+
+function deleteBioEntry(metricId) {
+  const bioLog = loadBioLog();
+  if (bioLog[metricId] && bioLog[metricId].length > 0) {
+    bioLog[metricId].pop();
+  }
+  saveBioLog(bioLog);
+  refreshBioTab();
+}
+
+function addBioEntry(metricId) {
+  const input = document.getElementById(`bio-${metricId}`);
+  if (!input) return;
+  const val = parseFloat(input.value);
+  if (!val || val <= 0) return;
+  const bioLog = loadBioLog();
+  if (!bioLog[metricId]) bioLog[metricId] = [];
+  const today = new Date().toISOString().slice(0, 10);
+  const existing = bioLog[metricId].findIndex(e => e.date === today);
+  if (existing >= 0) bioLog[metricId][existing].val = val;
+  else bioLog[metricId].push({ date: today, val });
+  saveBioLog(bioLog);
+  input.value = '';
+  refreshBioTab();
+}
+
+function addBioEntryFtIn() {
+  const ft = parseInt(document.getElementById('bio-height-ft')?.value) || 0;
+  const inch = parseFloat(document.getElementById('bio-height-in')?.value) || 0;
+  if (ft === 0 && inch === 0) return;
+  const cm = Math.round(((ft * 12) + inch) * 2.54 * 10) / 10;
+  const bioLog = loadBioLog();
+  if (!bioLog['height']) bioLog['height'] = [];
+  const today = new Date().toISOString().slice(0, 10);
+  const existing = bioLog['height'].findIndex(e => e.date === today);
+  if (existing >= 0) bioLog['height'][existing].val = cm;
+  else bioLog['height'].push({ date: today, val: cm });
+  saveBioLog(bioLog);
+  refreshBioTab();
+}
+
+function refreshBioTab() {
+  const sidebarBody = document.getElementById('sidebarBody');
+  if (!sidebarBody) return;
+  // Scroll pozisyonunu kaydet
+  const scrollTop = sidebarBody.scrollTop;
+  // Bio sekmesine tıkla (tab içeriğini yeniler)
+  const bioBtn = document.querySelector('[data-tab="bio"]');
+  if (bioBtn) bioBtn.click();
+  // Scroll pozisyonunu geri yükle
+  requestAnimationFrame(() => { sidebarBody.scrollTop = scrollTop; });
 }
 
 // ── DRAG & DROP (exercise reorder) ──
@@ -2183,8 +2562,8 @@ function initDragDrop(cardEl, ei) {
     const groupId = getSupersetGroup(exs, dragSrcIdx);
     const targetGroupId = getSupersetGroup(exs, ei);
 
-    // SS grubu içi yer değiştirme — aynı gruptaki egzersizler yer değiştirebilir
     if (groupId && groupId === targetGroupId) {
+      // SS içi yer değiştirme
       const [moved] = exs.splice(dragSrcIdx, 1);
       const insertAt = Math.max(0, Math.min(ei > dragSrcIdx ? ei : ei, exs.length));
       exs.splice(insertAt, 0, moved);
@@ -2192,15 +2571,34 @@ function initDragDrop(cardEl, ei) {
       // Farklı iki SS grubu → birleştir
       mergeGroups(exs, targetGroupId, groupId);
       moveSupersetPair(exs, dragSrcIdx, ei);
-    } else if (!groupId && wouldSplitGroup(exs, dragSrcIdx, ei)) {
-      // Bağımsız egzersizin SS zinciri içine girmesini engelle
-      dragSrcIdx = null; return;
     } else if (groupId) {
+      // SS grubunu normal yere taşı
       moveSupersetPair(exs, dragSrcIdx, ei);
-    } else {
-      // SS bağlı değil — normal taşı
+    } else if (!groupId && targetGroupId) {
+      // Bağımsız egzersiz SS grubundaki bir karta bırakıldı
+      // Grubun ilk ve son index'ini bul
+      let firstGroupIdx = ei, lastGroupIdx = ei;
+      for (let i = ei - 1; i >= 0; i--) {
+        if (exs[i].ssGroup === targetGroupId) firstGroupIdx = i; else break;
+      }
+      for (let i = ei + 1; i < exs.length; i++) {
+        if (exs[i].ssGroup === targetGroupId) lastGroupIdx = i; else break;
+      }
+      // Sürükleme yukarıdan mı aşağıdan mı?
       const [moved] = exs.splice(dragSrcIdx, 1);
-      const insertAt = Math.max(0, Math.min(ei > dragSrcIdx ? ei - 1 : ei, exs.length));
+      // dragSrcIdx'i çıkardıktan sonra indeksleri güncelle
+      const adjFirst = dragSrcIdx < firstGroupIdx ? firstGroupIdx - 1 : firstGroupIdx;
+      const adjLast  = dragSrcIdx < lastGroupIdx  ? lastGroupIdx  - 1 : lastGroupIdx;
+      // Kaynaktan hedefe yöne göre: üstten geliyorsa grubun üstüne, alttan geliyorsa altına
+      const insertAt = dragSrcIdx < ei
+        ? adjLast + 1   // aşağıdan geldi → grubun altına
+        : adjFirst;     // yukarıdan geldi → grubun üstüne
+      exs.splice(Math.max(0, Math.min(insertAt, exs.length)), 0, moved);
+      fixSupersetIndices(exs, dragSrcIdx, insertAt);
+    } else {
+      // Normal taşı
+      const [moved] = exs.splice(dragSrcIdx, 1);
+      const insertAt = Math.max(0, Math.min(ei > dragSrcIdx ? ei : ei, exs.length));
       exs.splice(insertAt, 0, moved);
       fixSupersetIndices(exs, dragSrcIdx, insertAt);
     }
@@ -2303,20 +2701,35 @@ function initDragDrop(cardEl, ei) {
       const groupId = getSupersetGroup(exs, touchSrcIdx);
       const targetGroupId = newIdx < exs.length ? getSupersetGroup(exs, newIdx) : null;
 
-      // Bağımsız egzersizin SS zinciri içine girmesini engelle
-      if (!groupId && wouldSplitGroup(exs, touchSrcIdx, newIdx)) {
-        removeGhost(); dragActive = false; touchSrcIdx = null; return;
-      }
-
       if (newIdx !== touchSrcIdx) {
-        if (groupId && targetGroupId && groupId !== targetGroupId) {
+        if (groupId && groupId === targetGroupId) {
+          const [moved] = exs.splice(touchSrcIdx, 1);
+          const insertAt = Math.max(0, Math.min(newIdx, exs.length));
+          exs.splice(insertAt, 0, moved);
+        } else if (groupId && targetGroupId && groupId !== targetGroupId) {
           mergeGroups(exs, targetGroupId, groupId);
           moveSupersetPair(exs, touchSrcIdx, newIdx);
         } else if (groupId) {
           moveSupersetPair(exs, touchSrcIdx, newIdx);
+        } else if (!groupId && targetGroupId) {
+          let firstGroupIdx = newIdx, lastGroupIdx = newIdx;
+          for (let i = newIdx - 1; i >= 0; i--) {
+            if (exs[i].ssGroup === targetGroupId) firstGroupIdx = i; else break;
+          }
+          for (let i = newIdx + 1; i < exs.length; i++) {
+            if (exs[i].ssGroup === targetGroupId) lastGroupIdx = i; else break;
+          }
+          const [moved] = exs.splice(touchSrcIdx, 1);
+          const adjFirst = touchSrcIdx < firstGroupIdx ? firstGroupIdx - 1 : firstGroupIdx;
+          const adjLast  = touchSrcIdx < lastGroupIdx  ? lastGroupIdx  - 1 : lastGroupIdx;
+          const insertAt = touchSrcIdx < newIdx
+            ? adjLast + 1
+            : adjFirst;
+          exs.splice(Math.max(0, Math.min(insertAt, exs.length)), 0, moved);
+          fixSupersetIndices(exs, touchSrcIdx, insertAt);
         } else {
           const [moved] = exs.splice(touchSrcIdx, 1);
-          const insertAt = Math.max(0, Math.min(touchSrcIdx < newIdx ? newIdx - 1 : newIdx, exs.length));
+          const insertAt = Math.max(0, Math.min(newIdx, exs.length));
           exs.splice(insertAt, 0, moved);
           fixSupersetIndices(exs, touchSrcIdx, insertAt);
         }
@@ -2433,10 +2846,96 @@ function renderTabs() {
     btn.className = 'day-tab' + (i === activeDay ? ' active' : '') + (i === today ? ' has-program' : '');
     btn.textContent = getDayName(day, i);
     btn.onclick = () => { activeDay = i; render(); requestAnimationFrame(() => scrollTabToCenter(i)); };
+
+    // Uzun basma — gün kopyalama (sadece düzenleme modunda)
+    if (!viewingWeek) {
+      let pressTimer = null;
+      btn.addEventListener('touchstart', () => {
+        pressTimer = setTimeout(() => { openCopyDayModal(i); }, 600);
+      }, { passive: true });
+      btn.addEventListener('touchend', () => clearTimeout(pressTimer), { passive: true });
+      btn.addEventListener('touchmove', () => clearTimeout(pressTimer), { passive: true });
+      btn.addEventListener('mousedown', () => {
+        pressTimer = setTimeout(() => { openCopyDayModal(i); }, 600);
+      });
+      btn.addEventListener('mouseup', () => clearTimeout(pressTimer));
+      btn.addEventListener('mouseleave', () => clearTimeout(pressTimer));
+    }
+
     container.appendChild(btn);
   });
   container.addEventListener('scroll', updateArrows, { passive: true });
   setTimeout(() => { updateArrows(); scrollTabToCenter(activeDay); }, 50);
+}
+
+let copyDaySrcIdx = null;
+
+function openCopyDayModal(srcIdx) {
+  copyDaySrcIdx = srcIdx;
+  const srcName = getDayName(state.days[srcIdx], srcIdx);
+  const title = document.getElementById('copyDayTitle');
+  title.textContent = lang === 'tr' ? `"${srcName}" gününü kopyala` : `Copy "${srcName}"`;
+
+  const btns = document.getElementById('copyDayBtns');
+  btns.innerHTML = '';
+
+  I18N[lang].days.forEach((_, i) => {
+    if (i === srcIdx) return;
+    const dayName = getDayName(state.days[i], i);
+    const hasExercises = state.days[i].exercises.length > 0;
+    const btn = document.createElement('button');
+    btn.style.cssText = `width:100%;padding:13px 16px;border-radius:12px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:14px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:space-between;`;
+    btn.innerHTML = `<span>${dayName}</span>${hasExercises ? `<span style="font-size:11px;color:var(--text-muted)">${lang === 'tr' ? `${state.days[i].exercises.length} egzersiz` : `${state.days[i].exercises.length} exercises`}</span>` : ''}`;
+    btn.onclick = () => confirmCopyDay(i, hasExercises);
+    btns.appendChild(btn);
+  });
+
+  document.getElementById('copyDayOverlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function confirmCopyDay(destIdx, hasExercises) {
+  if (hasExercises) {
+    const destName = getDayName(state.days[destIdx], destIdx);
+    const replaceText = lang === 'tr' ? 'Üzerine Yaz' : 'Replace';
+    const appendText = lang === 'tr' ? 'Sonuna Ekle' : 'Append';
+    const cancelText = lang === 'tr' ? 'İptal' : 'Cancel';
+    const msg = lang === 'tr'
+      ? `"${destName}" gününde zaten egzersizler var.`
+      : `"${destName}" already has exercises.`;
+
+    // Mini seçim modalı — mevcut modal içine inject et
+    const btns = document.getElementById('copyDayBtns');
+    btns.innerHTML = `
+      <p style="font-size:13px;color:var(--text-secondary);margin:0 0 12px">${msg}</p>
+      <button onclick="doCopyDay(${destIdx},'replace')" style="width:100%;padding:13px;border-radius:12px;border:none;background:var(--accent);color:#fff;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:8px">${replaceText}</button>
+      <button onclick="doCopyDay(${destIdx},'append')" style="width:100%;padding:13px;border-radius:12px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:14px;font-weight:500;cursor:pointer">${appendText}</button>
+    `;
+  } else {
+    doCopyDay(destIdx, 'replace');
+  }
+}
+
+function doCopyDay(destIdx, mode) {
+  const src = state.days[copyDaySrcIdx];
+  const dest = state.days[destIdx];
+  const copied = JSON.parse(JSON.stringify(src.exercises));
+  if (mode === 'replace') {
+    dest.exercises = copied;
+  } else {
+    dest.exercises = [...dest.exercises, ...copied];
+  }
+  saveState();
+  closeCopyDayModal();
+  const destName = getDayName(state.days[destIdx], destIdx);
+  showFlash(lang === 'tr' ? `${destName}'ye kopyalandı` : `Copied to ${destName}`);
+  render();
+}
+
+function closeCopyDayModal() {
+  document.getElementById('copyDayOverlay').classList.remove('open');
+  document.body.style.overflow = '';
+  copyDaySrcIdx = null;
 }
 
 function renderContent() {
@@ -3183,6 +3682,7 @@ function addExercise() {
 
 document.getElementById('editDayOverlay').addEventListener('click', function(e) { if (e.target === this) closeEditDayModal(); });
 document.getElementById('addExerciseOverlay').addEventListener('click', function(e) { if (e.target === this) closeAddExerciseModal(); });
+document.getElementById('copyDayOverlay').addEventListener('click', function(e) { if (e.target === this) closeCopyDayModal(); });
 document.getElementById('editExerciseOverlay').addEventListener('click', function(e) { if (e.target === this) closeEditExerciseModal(); });
 
 function scrollTabs(dir) {
@@ -3216,6 +3716,15 @@ function updateArrows() {
 
 // ── SETTINGS ──
 let weightUnit = 'kg';
+let lengthUnit = 'cm';
+
+function setLengthUnit(unit) {
+  lengthUnit = unit;
+  try { localStorage.setItem('antrenman_length_unit', unit); } catch(e) {}
+  document.getElementById('unitCmBtn')?.classList.toggle('active', unit === 'cm');
+  document.getElementById('unitInBtn')?.classList.toggle('active', unit === 'in');
+  refreshActivePanel();
+}
 
 function openSettings() {
   document.getElementById('settingsOverlay').classList.add('open');
@@ -3307,8 +3816,8 @@ function setWeightUnit(unit) {
   try { localStorage.setItem('antrenman_unit', unit); } catch(e) {}
   document.getElementById('unitKgBtn').classList.toggle('active', unit === 'kg');
   document.getElementById('unitLbsBtn').classList.toggle('active', unit === 'lbs');
-  // Tüm ağırlık etiketlerini güncelle
   document.querySelectorAll('.weight-unit-label').forEach(el => el.textContent = unit);
+  refreshActivePanel();
 }
 
 // Load saved unit
@@ -3316,6 +3825,14 @@ function setWeightUnit(unit) {
   try {
     const saved = localStorage.getItem('antrenman_unit');
     if (saved === 'lbs') setWeightUnit('lbs');
+  } catch(e) {}
+})();
+
+// Load saved length unit
+(function() {
+  try {
+    const saved = localStorage.getItem('antrenman_length_unit');
+    if (saved === 'in') setLengthUnit('in');
   } catch(e) {}
 })();
 
@@ -3580,8 +4097,8 @@ function updateTimerDisplay() {
 
 // ── ACCENT COLOR ──
 const ACCENT_COLORS = [
-  { id: 'blue',    light: '#0071E3', dark: '#0a84ff', name: 'Mavi' },
   { id: 'green',   light: '#34C759', dark: '#30d158', name: 'Yeşil' },
+  { id: 'blue',    light: '#0071E3', dark: '#0a84ff', name: 'Mavi' },
   { id: 'red',     light: '#FF3B30', dark: '#ff453a', name: 'Kırmızı' },
   { id: 'orange',  light: '#FF9500', dark: '#ff9f0a', name: 'Turuncu' },
   { id: 'purple',  light: '#E91E8C', dark: '#FF2D9B', name: 'Mor' },
@@ -3593,7 +4110,7 @@ const ACCENT_COLORS = [
   { id: 'brown',   light: '#A2845E', dark: '#b59469', name: 'Kahve' },
   { id: 'gray',    light: '#636366', dark: '#98989d', name: 'Gri' },
 ];
-let accentId = 'blue';
+let accentId = 'green';
 
 function applyAccent(id) {
   accentId = id;
@@ -3634,7 +4151,7 @@ function renderAccentSwatches() {
     const saved = localStorage.getItem('antrenman_accent');
     if (saved && ACCENT_COLORS.find(c => c.id === saved)) accentId = saved;
     applyAccent(accentId);
-  } catch(e) { applyAccent('blue'); }
+  } catch(e) { applyAccent('green'); }
 })();
 
 function exportData() {
@@ -3645,10 +4162,12 @@ function exportData() {
     history: history,
     sessionSets: { ...sessionSets, _weekKey: getCurrentWeekKey() },
     weightLog: loadWeightLog(),
+    bioLog: loadBioLog(),
     settings: {
       theme: localStorage.getItem('antrenman_theme') || 'light',
       lang: localStorage.getItem('antrenman_lang') || 'en',
       unit: localStorage.getItem('antrenman_unit') || 'kg',
+        lengthUnit: localStorage.getItem('antrenman_length_unit') || 'cm',
       accent: localStorage.getItem('antrenman_accent') || 'blue',
     },
   };
@@ -3686,6 +4205,9 @@ function importData(event) {
       if (backup.weightLog) {
         try { localStorage.setItem(WEIGHT_KEY, JSON.stringify(backup.weightLog)); } catch(err) {}
       }
+      if (backup.bioLog) {
+        try { localStorage.setItem(BIO_KEY, JSON.stringify(backup.bioLog)); } catch(err) {}
+      }
 
       // Ayarları geri yükle
       if (backup.settings) {
@@ -3693,6 +4215,7 @@ function importData(event) {
         if (s.theme) { applyTheme(s.theme === 'dark'); }
         if (s.lang) { lang = s.lang; try { localStorage.setItem('antrenman_lang', lang); } catch(e) {} }
         if (s.unit) { weightUnit = s.unit; try { localStorage.setItem('antrenman_unit', weightUnit); } catch(e) {} }
+        if (s.lengthUnit) { setLengthUnit(s.lengthUnit); }
         if (s.accent) { accentId = s.accent; applyAccent(accentId); }
       }
 
