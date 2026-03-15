@@ -2472,7 +2472,6 @@ function displayWeight(kg) {
 function addWeightEntry() {
   const val = parseFloat(document.getElementById('weightInput')?.value);
   if (!val || val <= 0) return;
-  // Her zaman kg olarak sakla
   const kg = weightUnit === 'lbs' ? Math.round(val / 2.20462 * 100) / 100 : val;
   const log = loadWeightLog();
   const today = new Date().toISOString().slice(0, 10);
@@ -2480,7 +2479,21 @@ function addWeightEntry() {
   if (existing >= 0) log[existing].kg = kg;
   else log.push({ date: today, kg });
   saveWeightLog(log);
+  refreshWeightPanel('weight');
+}
+
+function refreshWeightPanel(keepTab) {
+  // Aktif tab'ı tespit et
+  const activeTabBtn = document.querySelector('#sidebarBody button[data-tab]');
+  const currentTab = keepTab || (activeTabBtn ? [...document.querySelectorAll('#sidebarBody button[data-tab]')].find(b => b.style.color === 'var(--accent)')?.dataset.tab : 'weight') || 'weight';
+  const sb = document.getElementById('sidebarBody');
+  const scrollTop = sb ? sb.scrollTop : 0;
   renderWeightPanel();
+  requestAnimationFrame(() => {
+    const btn = document.querySelector(`#sidebarBody button[data-tab="${currentTab}"]`);
+    if (btn) btn.click();
+    if (sb) sb.scrollTop = scrollTop;
+  });
 }
 
 function deleteWeightEntry(idx) {
@@ -2490,7 +2503,7 @@ function deleteWeightEntry(idx) {
   const realIdx = log.findIndex(e => e.date === entry.date && e.kg === entry.kg);
   if (realIdx >= 0) log.splice(realIdx, 1);
   saveWeightLog(log);
-  renderWeightPanel();
+  refreshWeightPanel('weight');
 }
 
 function deleteBioEntry(metricId) {
@@ -2534,15 +2547,7 @@ function addBioEntryFtIn() {
 }
 
 function refreshBioTab() {
-  const sidebarBody = document.getElementById('sidebarBody');
-  if (!sidebarBody) return;
-  // Scroll pozisyonunu kaydet
-  const scrollTop = sidebarBody.scrollTop;
-  // Bio sekmesine tıkla (tab içeriğini yeniler)
-  const bioBtn = document.querySelector('[data-tab="bio"]');
-  if (bioBtn) bioBtn.click();
-  // Scroll pozisyonunu geri yükle
-  requestAnimationFrame(() => { sidebarBody.scrollTop = scrollTop; });
+  refreshWeightPanel('bio');
 }
 
 // ── DRAG & DROP (exercise reorder) ──
