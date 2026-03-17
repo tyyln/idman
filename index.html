@@ -825,6 +825,28 @@
     letter-spacing: -0.1px;
   }
   .add-btn:hover { background: rgba(0,113,227,0.12); }
+  #addExBtn {
+    position: fixed;
+    bottom: 28px;
+    right: 28px;
+    width: 56px; height: 56px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    font-size: 28px;
+    font-weight: 300;
+    padding: 0;
+    width: 56px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+    z-index: 20;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: opacity 0.3s ease, filter 0.3s ease, transform 0.15s;
+  }
+  #addExBtn:hover { transform: scale(1.08); }
+  #addExBtn:active { transform: scale(0.94); }
+  #addExBtn span { display: none; }
 
   /* ── APP LAYOUT ── */
   body { display: flex; }
@@ -1182,7 +1204,7 @@
   <!-- Content -->
   <div id="contentWrap">
     <div id="content" style="min-height:80px;padding-bottom:40px;padding-top:16px"></div>
-    <button class="add-btn" id="addExBtn" onclick="openEditDayModal()" style="opacity:0;filter:blur(8px);transition:opacity 0.4s ease,filter 0.4s ease;margin-top:0;">+ <span data-i18n="addExercise"></span></button>
+    <button class="add-btn" id="addExBtn" onclick="openEditDayModal()" style="opacity:0;filter:blur(8px);transition:opacity 0.3s ease,filter 0.3s ease;">+</button>
   </div>
 </div>
 </div><!-- end app-layout -->
@@ -4732,6 +4754,11 @@ if ('serviceWorker' in navigator) {
 
   .progress-wrap { padding: 14px 16px !important; border-radius: 14px !important; }
 
+  #addExBtn {
+    bottom: calc(64px + env(safe-area-inset-bottom) + 16px) !important;
+    right: 20px !important;
+    width: 52px !important; height: 52px !important;
+  }
   .bottom-nav {
     display: flex !important;
     position: fixed !important;
