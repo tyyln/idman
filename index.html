@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -21,7 +21,7 @@
     --text: #1d1d1f;
     --text-muted: #6e6e73;
     --text-secondary: #86868b;
-    --nav-icon-color: #86868b;
+    --nav-icon-color: #000000;
     --accent: #0071e3;
     --accent-soft: rgba(0,113,227,0.08);
     --accent-hover: #0077ed;
@@ -44,7 +44,7 @@
     --text: #f5f5f7;
     --text-muted: #8d8d93;
     --text-secondary: #8d8d93;
-    --nav-icon-color: rgba(255,255,255,0.75);
+    --nav-icon-color: #ffffff;
     --accent: #0a84ff;
     --accent-soft: rgba(10,132,255,0.15);
     --accent-hover: #409cff;
@@ -57,6 +57,8 @@
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { -webkit-user-select: none; user-select: none; }
+  input, textarea, [contenteditable] { -webkit-user-select: text; user-select: text; }
 
   body, .sidebar, .modal, .workout-card, .progress-wrap,
   .day-tabs-wrap, .week-item, .set-input, .readonly-banner {
@@ -188,6 +190,44 @@
     margin-top: 2px;
     letter-spacing: -0.1px;
   }
+  .day-note-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 6px;
+    padding: 3px 9px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s;
+    letter-spacing: -0.1px;
+    max-width: 200px;
+  }
+  .day-note-tag.empty {
+    color: var(--text-secondary);
+    border: 1.5px dashed var(--border);
+    background: transparent;
+  }
+  .day-note-tag.filled {
+    color: var(--accent-text, var(--accent));
+    background: var(--accent-soft);
+    border: 1.5px solid color-mix(in srgb, var(--accent-text, var(--accent)) 25%, transparent);
+  }
+  .day-note-tag:active { opacity: 0.6; }
+  .day-note-input {
+    margin-top: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 3px 9px;
+    border-radius: 20px;
+    border: 1.5px solid var(--accent);
+    background: var(--surface);
+    color: var(--text);
+    outline: none;
+    width: 160px;
+    font-family: -apple-system, 'SF Pro Text', sans-serif;
+  }
   .btn-icon {
     background: var(--surface);
     border: none;
@@ -209,8 +249,8 @@
     align-items: center;
     gap: 12px;
     padding: 10px 18px;
-    background: var(--surface2);
-    border: 1px solid var(--border);
+    background: var(--surface);
+    border: none;
     border-radius: 14px;
     margin-bottom: 16px;
   }
@@ -260,6 +300,40 @@
     letter-spacing: -0.5px;
     min-width: 58px;
   }
+  .pause-btn {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    border: none;
+    background: #F4A228;
+    cursor: pointer;
+    flex-shrink: 0;
+    position: relative;
+    transition: background 0.15s, transform 0.15s;
+    margin-left: auto;
+  }
+  .pause-btn:active { transform: scale(0.92); }
+  .pause-btn::before, .pause-btn::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    width: 3px; height: 11px;
+    background: #fff;
+    border-radius: 2px;
+    transform: translateY(-50%);
+  }
+  .pause-btn::before { left: 11px; }
+  .pause-btn::after  { left: 18px; }
+  .pause-btn.paused::before {
+    width: 0; height: 0;
+    border-style: solid;
+    border-width: 6px 0 6px 10px;
+    border-color: transparent transparent transparent #fff;
+    background: none;
+    border-radius: 0;
+    left: 12px;
+    transform: translateY(-50%);
+  }
+  .pause-btn.paused::after { display: none; }
   .timer-label {
     font-size: 13px;
     color: var(--text-secondary);
@@ -624,7 +698,6 @@
   .modal-field input[type=number]::-webkit-outer-spin-button,
   .modal-field input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
   .modal-field input[type=number] { -moz-appearance: textfield; appearance: textfield; }
-  }
   .modal-field input:focus, .modal-field select:focus { outline: none; box-shadow: 0 0 0 3px rgba(0,113,227,0.2); background: var(--surface); }
   .modal-row { display: flex; gap: 10px; }
   .modal-row .modal-field { flex: 1; }
@@ -738,9 +811,9 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    color: var(--accent);
+    color: var(--accent-text, var(--accent));
     background: var(--accent-soft);
-    border: none;
+    border: 1.5px solid color-mix(in srgb, var(--accent-text, var(--accent)) 40%, transparent);
     border-radius: 14px;
     padding: 13px 16px;
     cursor: pointer;
@@ -792,6 +865,8 @@
     transition: background 0.15s, color 0.15s;
   }
   .left-col-btn svg { width: 20px; height: 20px; }
+  #navBtnHistory svg, #mobileNavHistory svg { width: 23px; height: 23px; }
+  #navBtnWeight svg, #mobileNavWeight svg { width: 27px; height: 27px; }
   .left-col-btn:hover { background: var(--surface2); color: var(--text); }
   .left-col-btn.active { background: var(--accent-soft); color: var(--accent); }
 
@@ -882,6 +957,13 @@
     color: var(--accent);
     box-shadow: 0 1px 4px rgba(0,0,0,0.12);
   }
+  @keyframes theme-btn-flip {
+    0%   { transform: scale(1) rotate(0deg); opacity: 1; }
+    40%  { transform: scale(0) rotate(180deg); opacity: 0; }
+    60%  { transform: scale(0) rotate(180deg); opacity: 0; }
+    100% { transform: scale(1) rotate(360deg); opacity: 1; }
+  }
+  #settingsThemeBtn.flipping { animation: theme-btn-flip 0.4s ease; }
 
   /* ── SIDEBAR (inline panel, not overlay) ── */
   .sidebar-overlay {
@@ -1060,6 +1142,7 @@
       <div>
         <h1 id="header-title">Antrenman</h1>
         <div class="header-sub" id="header-sub">Bugün ne çalışıyoruz?</div>
+        <div id="dayNoteWrap"></div>
       </div>
     </div>
     <button class="btn-icon" id="themeBtn" onclick="toggleTheme()" title="Tema değiştir" style="display:none">🌙</button>
@@ -1070,7 +1153,8 @@
     <button class="timer-btn" id="timerBtn" onclick="toggleWorkout()"></button>
     <span class="timer-display" id="timerDisplay">00:00</span>
     <span class="timer-label" id="timerLabel" data-i18n="startWorkout"></span>
-    <button id="newWorkoutBtn" onclick="startNewWorkout()" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:6px 12px;font-size:12px;font-weight:600;color:var(--text-secondary);cursor:pointer;white-space:nowrap" data-i18n="newWorkout"></button>
+    <button class="pause-btn" id="pauseBtn" onclick="pauseWorkout()" style="display:none"></button>
+    <button id="newWorkoutBtn" onclick="confirmNewWorkout()" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:6px 12px;font-size:12px;font-weight:600;color:var(--text-secondary);cursor:pointer;white-space:nowrap" data-i18n="newWorkout"></button>
     <button id="viewSummaryBtn" onclick="showWorkoutSummary(workoutElapsedOnStop, (!viewingWeek && activeDay !== getTodayIndex()) || !!viewingWeek)" style="display:none;margin-left:auto;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:6px 12px;font-size:12px;font-weight:600;color:var(--text-secondary);cursor:pointer;white-space:nowrap" data-i18n="viewSummary"></button>
   </div>
 
@@ -1568,7 +1652,7 @@ function loadState() {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) return JSON.parse(saved);
   } catch(e) {}
-  return { days: I18N['tr'].days.map(name => ({ name, exercises: [] })) };
+  return { days: I18N['tr'].days.map(name => ({ name, exercises: [] })), dayNotes: Array(7).fill('') };
 }
 
 function saveState() {
@@ -1593,7 +1677,9 @@ function saveCurrentWeekToHistory() {
   if (doneSets.length === 0) return;
   const weekKey = getCurrentWeekKey();
   if (!history[weekKey]) {
-    history[weekKey] = { sets: {}, days: JSON.parse(JSON.stringify(state.days)) };
+    history[weekKey] = { sets: {}, days: JSON.parse(JSON.stringify(state.days)), dayNotes: JSON.parse(JSON.stringify(state.dayNotes || Array(7).fill(''))) };
+  } else if (!history[weekKey].dayNotes) {
+    history[weekKey].dayNotes = JSON.parse(JSON.stringify(state.dayNotes || Array(7).fill('')));
   }
   Object.entries(sessionSets).forEach(([k, v]) => {
     history[weekKey].sets[k] = v;
@@ -2963,9 +3049,11 @@ function updateTimerBar() {
       // Currently running
       timerBtn.style.display = '';
       timerDisplay.style.display = '';
-      timerLabel.style.display = '';
+      timerLabel.style.display = 'none';
       newWorkoutBtn.style.display = 'none';
       viewSummaryBtn.style.display = 'none';
+      const pb = document.getElementById('pauseBtn');
+      if (pb) { pb.style.display = 'flex'; if (!workoutPaused) pb.classList.remove('paused'); }
     } else if (workoutElapsedOnStop > 0) {
       // Stopped, has a previous session
       timerBtn.style.display = 'none';
@@ -3087,6 +3175,54 @@ function closeCopyDayModal() {
   copyDaySrcIdx = null;
 }
 
+function renderDayNote(isReadonly) {
+  const wrap = document.getElementById('dayNoteWrap');
+  if (!wrap) return;
+  if (!state.dayNotes) state.dayNotes = Array(7).fill('');
+  const notes = isReadonly ? (history[viewingWeek]?.dayNotes || state.dayNotes) : state.dayNotes;
+  const note = notes[activeDay] || '';
+  wrap.innerHTML = '';
+  if (isReadonly) {
+    if (note) {
+      const tag = document.createElement('div');
+      tag.className = 'day-note-tag filled';
+      tag.textContent = note;
+      wrap.appendChild(tag);
+    }
+    return;
+  }
+  const tag = document.createElement('div');
+  tag.className = note ? 'day-note-tag filled' : 'day-note-tag empty';
+  tag.textContent = note || (lang === 'tr' ? '+ Not ekle' : '+ Add note');
+  tag.onclick = () => openDayNoteEdit(note);
+  wrap.appendChild(tag);
+}
+
+function openDayNoteEdit(current) {
+  const wrap = document.getElementById('dayNoteWrap');
+  wrap.innerHTML = '';
+  const input = document.createElement('input');
+  input.className = 'day-note-input';
+  input.type = 'text';
+  input.maxLength = 30;
+  input.placeholder = lang === 'tr' ? 'Leg Day, Göğüs...' : 'Leg Day, Chest...';
+  input.value = current || '';
+  input.onblur = () => saveDayNote(input.value.trim());
+  input.onkeydown = e => {
+    if (e.key === 'Enter') input.blur();
+    if (e.key === 'Escape') { input.onblur = null; renderDayNote(false); }
+  };
+  wrap.appendChild(input);
+  input.focus();
+}
+
+function saveDayNote(val) {
+  if (!state.dayNotes) state.dayNotes = Array(7).fill('');
+  state.dayNotes[activeDay] = val;
+  saveState();
+  renderDayNote(false);
+}
+
 function renderContent() {
   const isReadonly = viewingWeek !== null;
   const weekData = isReadonly ? history[viewingWeek] : null;
@@ -3113,6 +3249,7 @@ function renderContent() {
       headerSub.textContent = I18N[lang].days[activeDay];
     }
   }
+  renderDayNote(isReadonly);
 
   if (!day || day.exercises.length === 0) {
     progressWrap.style.display = 'none';
@@ -3307,6 +3444,34 @@ function deleteExerciseLive(ei) {
   const card = document.getElementById(`card-${ei}`);
   if (!card) return;
 
+  const isLast = state.days[activeDay].exercises.length === 1;
+
+  if (isLast) {
+    const exs = state.days[activeDay].exercises;
+    const ssGroup = exs[ei]?.ssGroup;
+    exs.splice(ei, 1);
+    if (ssGroup) {
+      const remaining = exs.filter(e => e.ssGroup === ssGroup);
+      if (remaining.length <= 1) remaining.forEach(e => { e.ssGroup = null; });
+    }
+    const newSets = {};
+    Object.entries(sessionSets).forEach(([key, val]) => {
+      const parts = key.split('-');
+      const day = parseInt(parts[0]), ex = parseInt(parts[1]), set = parseInt(parts[2]);
+      if (day !== activeDay) { newSets[key] = val; return; }
+      if (ex < ei) { newSets[key] = val; }
+      else if (ex > ei) { newSets[`${day}-${ex-1}-${set}`] = val; }
+    });
+    sessionSets = newSets;
+    saveState();
+    saveCurrentWeekToHistory();
+    render();
+    const main = document.querySelector('.main');
+    if (main) main.scrollTop = 0;
+    window.scrollTo(0, 0);
+    return;
+  }
+
   // SS connector'ları hemen kaldır (bu kartın altındaki ve üstündeki)
   const connectorAfter = document.getElementById(`ss-connector-${ei}`);
   if (connectorAfter) connectorAfter.remove();
@@ -3356,11 +3521,6 @@ function deleteExerciseLive(ei) {
     saveState();
     saveCurrentWeekToHistory();
     render();
-    if (state.days[activeDay].exercises.length === 0) {
-      const main = document.querySelector('.main');
-      if (main) main.scrollTop = 0;
-      window.scrollTo(0, 0);
-    }
   }, 620);
 }
 
@@ -3615,11 +3775,11 @@ function saveDay() {
 // ── EXERCISE LIBRARY ──
 // ── SVG ICONS ──
 const ICONS = {
-  history: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="4" width="18" height="17" rx="3" stroke="currentColor" stroke-width="1.8" fill="none"/><line x1="3" y1="9" x2="21" y2="9" stroke="currentColor" stroke-width="1.8"/><line x1="8" y1="2" x2="8" y2="6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="16" y1="2" x2="16" y2="6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><rect x="7" y="12" width="3" height="3" rx="0.5" fill="currentColor"/><rect x="11" y="12" width="3" height="3" rx="0.5" fill="currentColor"/><rect x="7" y="16" width="3" height="3" rx="0.5" fill="currentColor"/><rect x="11" y="16" width="3" height="3" rx="0.5" fill="currentColor"/><rect x="15" y="12" width="3" height="3" rx="0.5" fill="currentColor"/></svg>`,
-  progress: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><line x1="4" y1="20" x2="20" y2="20" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="4" y1="20" x2="4" y2="4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><rect x="6" y="13" width="3" height="7" rx="1" fill="currentColor"/><rect x="11" y="9" width="3" height="11" rx="1" fill="currentColor"/><rect x="16" y="5" width="3" height="15" rx="1" fill="currentColor"/></svg>`,
-  weight:   `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><line x1="12" y1="3" x2="12" y2="20" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="6" y1="20" x2="18" y2="20" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="6" y1="7" x2="18" y2="7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M6 7 L4 12 A2 2 0 0 0 8 12 Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" fill="none"/><path d="M18 7 L16 12 A2 2 0 0 0 20 12 Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" fill="none"/></svg>`,
+  history: `<svg width="23" height="23" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 9H21M7 3V5M17 3V5M6.2 21H17.8C18.9201 21 19.4802 21 19.908 20.782C20.2843 20.5903 20.5903 20.2843 20.782 19.908C21 19.4802 21 18.9201 21 17.8V8.2C21 7.07989 21 6.51984 20.782 6.09202C20.5903 5.71569 20.2843 5.40973 19.908 5.21799C19.4802 5 18.9201 5 17.8 5H6.2C5.0799 5 4.51984 5 4.09202 5.21799C3.71569 5.40973 3.40973 5.71569 3.21799 6.09202C3 6.51984 3 7.07989 3 8.2V17.8C3 18.9201 3 19.4802 3.21799 19.908C3.40973 20.2843 3.71569 20.5903 4.09202 20.782C4.51984 21 5.07989 21 6.2 21Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M17 13.0014L7 13M10.3333 17.0005L7 17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  progress: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M21 21H7.8C6.11984 21 5.27976 21 4.63803 20.673C4.07354 20.3854 3.6146 19.9265 3.32698 19.362C3 18.7202 3 17.8802 3 16.2V3M15 10V17M7 13V17M19 5V17M11 7V17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  weight:   `<svg width="20" height="20" viewBox="0 0 512 512" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M150.932,218.624c10.84,3.192,23.58,4.988,37.258,4.996c18.245-0.023,34.79-3.17,47.434-8.668c6.318-2.771,11.72-6.126,15.866-10.39c4.108-4.204,7.071-9.718,7.064-15.939c0.007-6.222-2.956-11.742-7.064-15.94c-6.237-6.362-15.216-10.825-26.048-14.062c-10.833-3.192-23.572-4.995-37.251-4.995c-18.244,0.014-34.79,3.162-47.441,8.668c-6.318,2.771-11.72,6.125-15.865,10.389c-4.108,4.198-7.072,9.718-7.065,15.94c-0.007,6.221,2.956,11.734,7.065,15.939C131.12,210.917,140.106,215.387,150.932,218.624z M135.754,183.213c3.303-3.495,10.249-7.404,19.464-10.079c9.207-2.72,20.64-4.382,32.972-4.374c16.434-0.023,31.288,2.97,41.374,7.404c5.04,2.187,8.846,4.744,11.048,7.05c2.246,2.357,2.8,4.05,2.808,5.41c-0.008,1.352-0.562,3.052-2.808,5.409c-3.296,3.488-10.242,7.404-19.457,10.079c-9.207,2.72-20.632,4.375-32.965,4.375c-16.441,0.014-31.294-2.971-41.381-7.404c-5.04-2.188-8.846-4.744-11.054-7.05c-2.246-2.357-2.794-4.057-2.801-5.409C132.96,187.263,133.508,185.57,135.754,183.213z"/><path d="M376.372,243.659v-55.037c0.008-8.114-1.929-15.888-5.224-22.922c-3.304-7.05-7.929-13.397-13.42-19.043c-16.412-16.766-40.488-28.812-69.388-37.458l-0.155-0.044c-29.041-8.564-63.262-13.397-99.996-13.405c-48.993,0.044-93.448,8.528-127.262,23.24l-0.015,0.008c-16.885,7.404-31.316,16.405-42.276,27.666C13.154,152.303,8.528,158.65,5.225,165.7C1.929,172.735-0.008,180.509,0,188.623v134.756c-0.008,8.113,1.929,15.88,5.225,22.915c3.303,7.05,7.929,13.397,13.412,19.043c16.413,16.766,40.472,28.812,69.358,37.45l0.192,0.059c29.049,8.565,63.262,13.39,100.003,13.405H512v-172.59H376.372z M37.658,165.101c11.38-11.838,31.82-22.856,58.03-30.548c26.204-7.737,58.119-12.326,92.502-12.319c45.838-0.022,87.308,8.18,116.659,21.031c14.676,6.399,26.27,13.966,33.866,21.836c7.634,7.929,11.166,15.739,11.174,23.521c-0.008,7.773-3.54,15.592-11.174,23.521c-11.38,11.83-31.819,22.848-58.03,30.541c-26.204,7.744-58.112,12.326-92.496,12.326c-45.845,0.015-87.314-8.187-116.666-21.031c-14.676-6.399-26.27-13.966-33.866-21.836c-7.634-7.929-11.166-15.748-11.174-23.521C26.492,180.841,30.024,173.03,37.658,165.101z M349.888,222.341v32.669h-58.23c6.746-2.202,13.256-4.552,19.249-7.168c15.954-6.983,29.145-15.348,38.684-25.176L349.888,222.341z M485.516,389.766h-45.402v-66.854h-15.134v66.854h-33.416v-36.209h-15.134v36.209h-33.423v-66.854h-15.134v66.854h-33.423v-36.209h-15.134v36.209h-33.415v-66.854h-15.134v66.854h-33.415v-36.209h-15.134v36.076c-11.491-0.177-22.657-0.857-33.423-2.01v-64.711h-15.134v62.76c-23.772-3.621-45.054-9.459-62.138-16.937c-14.676-6.399-26.27-13.966-33.866-21.836c-7.634-7.93-11.166-15.748-11.174-23.521V222.341l0.296,0.325c14.314,14.706,36.8,26.277,64.621,34.532c27.83,8.217,61.053,12.939,96.788,12.946h297.326V389.766z"/></svg>`,
   settings: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><line x1="3" y1="6" x2="21" y2="6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="3" y1="12" x2="21" y2="12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="3" y1="18" x2="21" y2="18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="8" cy="6" r="2.5" fill="var(--surface)" stroke="currentColor" stroke-width="1.8"/><circle cx="16" cy="12" r="2.5" fill="var(--surface)" stroke="currentColor" stroke-width="1.8"/><circle cx="10" cy="18" r="2.5" fill="var(--surface)" stroke="currentColor" stroke-width="1.8"/></svg>`,
-  dumbbell: `<svg width="28" height="28" viewBox="0 0 72 28" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><rect x="20" y="12" width="32" height="4" rx="2"/><rect x="13" y="10" width="8" height="8" rx="2"/><rect x="6" y="5" width="7" height="18" rx="2.5"/><rect x="0" y="8" width="6" height="12" rx="2"/><rect x="51" y="10" width="8" height="8" rx="2"/><rect x="59" y="5" width="7" height="18" rx="2.5"/><rect x="66" y="8" width="6" height="12" rx="2"/></svg>`,
+  dumbbell: `<svg width="28" height="28" viewBox="0 0 64 64" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M11.67,37.36h-3a1,1,0,0,1-1-1V27.64a1,1,0,0,1,1-1h3a1,1,0,0,1,1,1v8.72A1,1,0,0,1,11.67,37.36Zm-2-2h1V28.64h-1Z"/><path d="M15.67,39.59h-4a1,1,0,0,1-1-1V25.41a1,1,0,0,1,1-1h4a1,1,0,0,1,1,1V38.59A1,1,0,0,1,15.67,39.59Zm-3-2h2V26.41h-2Z"/><path d="M22.32,42H15.67a1,1,0,0,1-1-1V23a1,1,0,0,1,1-1h6.65a1,1,0,0,1,1,1V41A1,1,0,0,1,22.32,42Zm-5.65-2h4.65V24H16.67Z"/><path d="M55.33,37.36h-3a1,1,0,0,1-1-1V27.64a1,1,0,0,1,1-1h3a1,1,0,0,1,1,1v8.72A1,1,0,0,1,55.33,37.36Zm-2-2h1V28.64h-1Z"/><path d="M52.32,39.59h-4a1,1,0,0,1-1-1V25.41a1,1,0,0,1,1-1h4a1,1,0,0,1,1,1V38.59A1,1,0,0,1,52.32,39.59Zm-3-2h2V26.41h-2Z"/><path d="M48.32,42H41.67a1,1,0,0,1-1-1V23a1,1,0,0,1,1-1h6.65a1,1,0,0,1,1,1V41A1,1,0,0,1,48.32,42Zm-5.65-2h4.65V24H42.67Z"/><path d="M41.67,35H22.32a1,1,0,0,1-1-1V30a1,1,0,0,1,1-1H41.67a1,1,0,0,1,1,1V34A1,1,0,0,1,41.67,35ZM23.32,33H40.67V31H23.32Z"/></svg>`,
 };
 
 function applyIcons() {
@@ -4021,7 +4181,13 @@ function applyTheme(dark) {
   const btn = document.getElementById('themeBtn');
   if (btn) btn.textContent = dark ? '☀️' : '🌙';
   const settingsBtn = document.getElementById('settingsThemeBtn');
-  if (settingsBtn) settingsBtn.textContent = dark ? '☀️' : '🌙';
+  if (settingsBtn) {
+    settingsBtn.classList.remove('flipping');
+    void settingsBtn.offsetWidth;
+    settingsBtn.classList.add('flipping');
+    setTimeout(() => { settingsBtn.textContent = dark ? '☀️' : '🌙'; }, 160);
+    settingsBtn.addEventListener('animationend', () => settingsBtn.classList.remove('flipping'), { once: true });
+  }
   document.documentElement.style.setProperty('--surface-glass', dark ? 'rgba(28,28,30,0.92)' : 'rgba(255,255,255,0.92)');
   document.documentElement.style.setProperty('--modal-glass', dark ? 'rgba(28,28,30,0.97)' : 'rgba(255,255,255,0.96)');
   try { localStorage.setItem('antrenman_theme', dark ? 'dark' : 'light'); } catch(e) {}
@@ -4030,40 +4196,62 @@ function applyTheme(dark) {
 
 // ── WORKOUT TIMER ──
 let workoutActive = false;
+let workoutPaused = false;
 let workoutStartTime = null;
 let workoutTimerInterval = null;
 let workoutElapsedOnStop = 0;
+let workoutPausedElapsed = 0;
 
 function toggleWorkout() {
   if (!workoutActive) {
     workoutActive = true;
+    workoutPaused = false;
+    workoutPausedElapsed = 0;
     workoutStartTime = Date.now();
     workoutTimerInterval = setInterval(updateTimerDisplay, 1000);
     document.getElementById('timerBtn').style.display = '';
     document.getElementById('timerBtn').classList.add('running');
-    
     document.getElementById('timerDisplay').style.display = '';
     document.getElementById('timerDisplay').textContent = '00:00';
-    document.getElementById('timerLabel').style.display = '';
-    document.getElementById('timerLabel').textContent = t('stopWorkout');
+    document.getElementById('timerLabel').style.display = 'none';
     document.getElementById('newWorkoutBtn').style.display = 'none';
     document.getElementById('viewSummaryBtn').style.display = 'none';
+    const pb = document.getElementById('pauseBtn');
+    pb.style.display = 'flex'; pb.classList.remove('paused');
     updateTimerDisplay();
   } else {
-    const elapsed = Math.floor((Date.now() - workoutStartTime) / 1000);
+    const elapsed = workoutPausedElapsed + (workoutPaused ? 0 : Math.floor((Date.now() - workoutStartTime) / 1000));
     workoutElapsedOnStop = elapsed;
     clearInterval(workoutTimerInterval);
     workoutTimerInterval = null;
     workoutActive = false;
+    workoutPaused = false;
     workoutStartTime = null;
+    workoutPausedElapsed = 0;
     document.getElementById('timerBtn').classList.remove('running');
     document.getElementById('timerBtn').style.display = 'none';
     document.getElementById('timerDisplay').style.display = 'none';
     document.getElementById('timerLabel').style.display = 'none';
-    document.getElementById('timerLabel').textContent = t('startWorkout');
+    document.getElementById('pauseBtn').style.display = 'none';
     document.getElementById('newWorkoutBtn').style.display = 'block';
     document.getElementById('viewSummaryBtn').style.display = 'block';
     showWorkoutSummary(elapsed);
+  }
+}
+
+function pauseWorkout() {
+  const pb = document.getElementById('pauseBtn');
+  if (!workoutPaused) {
+    workoutPausedElapsed += Math.floor((Date.now() - workoutStartTime) / 1000);
+    clearInterval(workoutTimerInterval);
+    workoutTimerInterval = null;
+    workoutPaused = true;
+    pb.classList.add('paused');
+  } else {
+    workoutStartTime = Date.now();
+    workoutTimerInterval = setInterval(updateTimerDisplay, 1000);
+    workoutPaused = false;
+    pb.classList.remove('paused');
   }
 }
 
@@ -4220,6 +4408,22 @@ function openPRPanel() {
   }, 150);
 }
 
+function confirmNewWorkout() {
+  const msg = lang === 'tr' ? 'Yeni antrenman başlatılsın mı?' : 'Start a new workout?';
+  const sub = lang === 'tr' ? 'Mevcut antrenman verisi sıfırlanacak.' : 'Current workout data will be reset.';
+  const ok = lang === 'tr' ? 'Evet, başlat' : 'Yes, start new';
+  const cancel = lang === 'tr' ? 'İptal' : 'Cancel';
+  document.getElementById('newWorkoutConfirmMsg').textContent = msg;
+  document.getElementById('newWorkoutConfirmSub').textContent = sub;
+  document.getElementById('newWorkoutConfirmOk').textContent = ok;
+  document.getElementById('newWorkoutConfirmCancel').textContent = cancel;
+  document.getElementById('newWorkoutConfirmOverlay').classList.add('open');
+}
+
+function closeNewWorkoutConfirm() {
+  document.getElementById('newWorkoutConfirmOverlay').classList.remove('open');
+}
+
 function startNewWorkout() {
   workoutElapsedOnStop = 0;
   document.getElementById('newWorkoutBtn').style.display = 'none';
@@ -4239,15 +4443,16 @@ function resumeWorkout() {
   document.getElementById('newWorkoutBtn').style.display = 'none';
   document.getElementById('timerBtn').style.display = '';
   document.getElementById('timerBtn').classList.add('running');
-  
   document.getElementById('timerDisplay').style.display = '';
-  document.getElementById('timerLabel').style.display = '';
+  document.getElementById('timerLabel').style.display = 'none';
   workoutActive = true;
-  workoutStartTime = Date.now() - workoutElapsedOnStop * 1000;
+  workoutPaused = false;
+  workoutPausedElapsed = workoutElapsedOnStop;
+  workoutStartTime = Date.now();
   workoutTimerInterval = setInterval(updateTimerDisplay, 1000);
-  document.getElementById('timerBtn').classList.add('running');
-  
-  document.getElementById('timerLabel').textContent = t('stopWorkout');
+  const pb = document.getElementById('pauseBtn');
+  pb.style.display = 'flex';
+  pb.classList.remove('paused');
   updateTimerDisplay();
 }
 
@@ -4259,7 +4464,7 @@ function closeWorkoutSummary() {
 }
 
 function updateTimerDisplay() {
-  const elapsed = Math.floor((Date.now() - workoutStartTime) / 1000);
+  const elapsed = workoutPausedElapsed + Math.floor((Date.now() - workoutStartTime) / 1000);
   const h = Math.floor(elapsed / 3600);
   const m = Math.floor((elapsed % 3600) / 60);
   const s = elapsed % 60;
@@ -4295,6 +4500,13 @@ function applyAccent(id) {
   root.setProperty('--accent', hex);
   root.setProperty('--accent-hover', hex);
   root.setProperty('--accent-soft', `rgba(${r},${g},${b},0.12)`);
+  const lum = 0.2126 * (r/255) ** 2.2 + 0.7152 * (g/255) ** 2.2 + 0.0722 * (b/255) ** 2.2;
+  let textHex = hex;
+  if (!isDark && lum > 0.35) {
+    const f = 0.45;
+    textHex = `#${Math.round(r*f).toString(16).padStart(2,'0')}${Math.round(g*f).toString(16).padStart(2,'0')}${Math.round(b*f).toString(16).padStart(2,'0')}`;
+  }
+  root.setProperty('--accent-text', textHex);
   try { localStorage.setItem('antrenman_accent', id); } catch(e) {}
   renderAccentSwatches();
 }
@@ -4567,7 +4779,7 @@ if ('serviceWorker' in navigator) {
     color: #fff !important;
     margin-top: -16px !important;
   }
-  .bottom-nav-home svg { width: 28px !important; height: 28px !important; }
+  .bottom-nav-home svg { width: 42px !important; height: 42px !important; }
   .bottom-nav-home:active { opacity: 0.85 !important; background: var(--accent) !important; }
 }
 </style>
@@ -4579,6 +4791,15 @@ if ('serviceWorker' in navigator) {
   <button class="bottom-nav-btn bottom-nav-home" id="mobileNavHome" onclick="goHome()"></button>
   <button class="bottom-nav-btn" id="mobileNavWeight" onclick="openPanel('weight')"></button>
   <button class="bottom-nav-btn" id="mobileNavSettings" onclick="openSettings()"></button>
+</div>
+
+<div class="overlay" id="newWorkoutConfirmOverlay" onclick="if(event.target===this)closeNewWorkoutConfirm()" style="align-items:center">
+  <div class="modal" style="max-width:320px;width:90%;padding:24px;border-radius:20px">
+    <p id="newWorkoutConfirmMsg" style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px;letter-spacing:-0.2px"></p>
+    <p id="newWorkoutConfirmSub" style="font-size:13px;color:var(--text-secondary);margin-bottom:20px"></p>
+    <button onclick="closeNewWorkoutConfirm();startNewWorkout()" style="width:100%;padding:13px;border-radius:12px;border:none;background:var(--accent);color:#fff;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:8px" id="newWorkoutConfirmOk"></button>
+    <button onclick="closeNewWorkoutConfirm()" style="width:100%;padding:13px;border-radius:12px;border:1px solid var(--border);background:transparent;color:var(--text);font-size:14px;font-weight:500;cursor:pointer" id="newWorkoutConfirmCancel"></button>
+  </div>
 </div>
 
 </body>
