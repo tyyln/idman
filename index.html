@@ -3039,6 +3039,9 @@ function updateMainScroll() {
     : state.days[activeDay].exercises) || [];
   if (exercises.length === 0) {
     lockScroll();
+    window.scrollTo(0, 0);
+    const main = document.querySelector('.main');
+    if (main) main.scrollTop = 0;
   } else {
     unlockScroll();
   }
