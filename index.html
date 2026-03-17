@@ -58,6 +58,7 @@
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { -webkit-user-select: none; user-select: none; }
+  body.preload * { transition: none !important; animation: none !important; }
   input, textarea, [contenteditable] { -webkit-user-select: text; user-select: text; }
 
   body, .sidebar, .modal, .workout-card, .progress-wrap,
@@ -840,7 +841,7 @@
     padding: 0 0 3px 0;
     width: 56px;
     box-shadow: 0 4px 16px rgba(0,0,0,0.18);
-    z-index: 20;
+    z-index: 19;
     cursor: pointer;
     display: flex; align-items: center; justify-content: center;
     transition: opacity 0.3s ease, filter 0.3s ease, transform 0.15s;
@@ -1144,6 +1145,7 @@
       <input type="file" id="importInput" accept=".json" style="display:none" onchange="importData(event)">
     </div>
   </div>
+
 </div>
 
 <!-- Sidebar panel -->
@@ -1177,8 +1179,8 @@
     <span class="timer-display" id="timerDisplay">00:00</span>
     <span class="timer-label" id="timerLabel" data-i18n="startWorkout"></span>
     <button class="pause-btn" id="pauseBtn" onclick="pauseWorkout()" style="display:none"></button>
-    <button id="newWorkoutBtn" onclick="confirmNewWorkout()" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:6px 12px;font-size:12px;font-weight:600;color:var(--text-secondary);cursor:pointer;white-space:nowrap" data-i18n="newWorkout"></button>
-    <button id="viewSummaryBtn" onclick="showWorkoutSummary(workoutElapsedOnStop, (!viewingWeek && activeDay !== getTodayIndex()) || !!viewingWeek)" style="display:none;margin-left:auto;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:6px 12px;font-size:12px;font-weight:600;color:var(--text-secondary);cursor:pointer;white-space:nowrap" data-i18n="viewSummary"></button>
+    <button id="viewSummaryBtn" onclick="showWorkoutSummary(workoutElapsedOnStop, (!viewingWeek && activeDay !== getTodayIndex()) || !!viewingWeek)" style="display:none;background:var(--accent);border:1px solid transparent;border-radius:10px;padding:6px 12px;font-size:12px;font-weight:600;color:#fff;cursor:pointer;white-space:nowrap" data-i18n="viewSummary"></button>
+    <button id="newWorkoutBtn" onclick="confirmNewWorkout()" style="display:none;margin-left:auto;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:6px 12px;font-size:12px;font-weight:600;color:var(--text-secondary);cursor:pointer;white-space:nowrap" data-i18n="newWorkout"></button>
   </div>
 
   <!-- Readonly banner -->
@@ -3067,7 +3069,7 @@ function updateTimerBar() {
   } else {
     // Today — restore based on current workout state
     timerBar.style.justifyContent = '';
-    viewSummaryBtn.style.marginLeft = 'auto';
+    viewSummaryBtn.style.marginLeft = '0';
     if (workoutActive) {
       // Currently running
       timerBtn.style.display = '';
@@ -4431,6 +4433,58 @@ function openPRPanel() {
   }, 150);
 }
 
+// ── DEBUG ──
+function toggleDebugPanel() {
+  const panel = document.getElementById('debugPanel');
+  const visible = panel.style.display !== 'none';
+  panel.style.display = visible ? 'none' : 'block';
+  if (!visible) updateDebugInfo();
+}
+
+function updateDebugInfo() {
+  const el = id => document.getElementById(id);
+  el('debugCurrentKey').textContent = getCurrentWeekKey();
+  el('debugHistoryCount').textContent = Object.keys(history).length + ' hafta';
+  el('debugSetCount').textContent = Object.values(sessionSets).filter(s => s?.done).length + ' set';
+}
+
+function debugSimulateWeekChange() {
+  const fakeNextWeek = getWeekKey(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
+  saveCurrentWeekToHistory();
+  const oldKey = _sessionWeekKey;
+  _sessionWeekKey = fakeNextWeek;
+  try {
+    localStorage.setItem('antrenman_session_v1', JSON.stringify({ weekKey: fakeNextWeek, sets: {} }));
+  } catch(e) {}
+  sessionSets = {};
+  carryOverLastWeek();
+  saveState();
+  updateDebugInfo();
+  const msg = `✅ Simülasyon tamamlandı!\n\n• "${oldKey}" haftası history'ye kaydedildi\n• Session sıfırlandı\n• Placeholder'lar güncellendi\n\nHistory'de ${Object.keys(history).length} hafta var.`;
+  alert(msg);
+  render();
+}
+
+function debugShowHistoryRaw() {
+  const keys = Object.keys(history).sort((a,b) => b.localeCompare(a));
+  if (keys.length === 0) { alert('Henüz kayıtlı hafta yok.'); return; }
+  let out = `📦 Kayıtlı ${keys.length} hafta:\n\n`;
+  keys.forEach(k => {
+    const h = history[k];
+    const doneSets = Object.values(h.sets || {}).filter(s => s?.done).length;
+    const exCount = (h.days || []).reduce((acc, d) => acc + (d.exercises?.length || 0), 0);
+    const note = (h.dayNotes || []).filter(Boolean).join(', ') || '—';
+    out += `• ${k}: ${doneSets} set, ${exCount} egzersiz, notlar: ${note}\n`;
+  });
+  alert(out);
+}
+
+function debugResetAll() {
+  if (!confirm('Tüm veriler silinecek. Emin misin?')) return;
+  localStorage.clear();
+  location.reload();
+}
+
 function confirmNewWorkout() {
   const msg = lang === 'tr' ? 'Yeni antrenman başlatılsın mı?' : 'Start a new workout?';
   const sub = lang === 'tr' ? 'Mevcut antrenman verisi sıfırlanacak.' : 'Current workout data will be reset.';
@@ -4665,9 +4719,17 @@ function toggleTheme() {
 document.addEventListener('visibilitychange', () => { if (document.hidden) saveCurrentWeekToHistory(); });
 window.addEventListener('beforeunload', saveCurrentWeekToHistory);
 
+document.documentElement.style.visibility = 'hidden';
+document.body.classList.add('preload');
 render();
 applyI18n();
-window.addEventListener('load', applyIcons);
+window.addEventListener('load', () => {
+  applyIcons();
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    document.body.classList.remove('preload');
+    document.documentElement.style.visibility = '';
+  }));
+});
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
