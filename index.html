@@ -3957,6 +3957,8 @@ function initModalSwipe() {
   let startY = 0, currentY = 0, dragging = false;
 
   function onStart(e) {
+    const libraryList = document.getElementById('libraryList');
+    if (libraryList && libraryList.contains(e.target)) { dragging = false; return; }
     const touch = e.touches ? e.touches[0] : e;
     startY = touch.clientY;
     currentY = 0;
