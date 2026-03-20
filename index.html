@@ -3547,6 +3547,8 @@ function openPanel(panel) {
     const mBtn = document.getElementById('mobileNav' + key);
     if (mBtn) mBtn.classList.toggle('active', p === panel);
   });
+  const homeBtn = document.getElementById('mobileNavHome');
+  if (homeBtn) homeBtn.classList.remove('home-active');
 }
 
 function openSidebar() { openPanel('history'); }
@@ -3565,6 +3567,8 @@ function closeSidebar() {
     const mBtn = document.getElementById('mobileNav' + p);
     if (mBtn) mBtn.classList.remove('active');
   });
+  const homeBtn = document.getElementById('mobileNavHome');
+  if (homeBtn) homeBtn.classList.add('home-active');
   updateMainScroll();
 }
 
@@ -6610,6 +6614,8 @@ render();
 applyI18n();
 window.addEventListener('load', () => {
   applyIcons();
+  const homeBtn = document.getElementById('mobileNavHome');
+  if (homeBtn) homeBtn.classList.add('home-active');
   requestAnimationFrame(() => requestAnimationFrame(() => {
     document.body.classList.remove('preload');
     document.documentElement.style.visibility = '';
@@ -6790,9 +6796,25 @@ if ('serviceWorker' in navigator) {
     box-shadow: 0 4px 14px rgba(0,0,0,0.25) !important;
     color: #fff !important;
     margin-top: -16px !important;
+    position: relative !important;
+    overflow: visible !important;
   }
   .bottom-nav-home svg { width: 42px !important; height: 42px !important; }
   .bottom-nav-home:active { opacity: 0.85 !important; background: var(--accent) !important; }
+
+  .bottom-nav-home::after {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.8);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+  }
+  .bottom-nav-home.home-active::after {
+    opacity: 1;
+  }
 }
 </style>
 
