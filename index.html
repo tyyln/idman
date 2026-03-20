@@ -6805,15 +6805,18 @@ if ('serviceWorker' in navigator) {
   .bottom-nav-home::after {
     content: '';
     position: absolute;
-    inset: -3px;
+    inset: -4px;
     border-radius: 50%;
-    border: 2px solid rgba(255,255,255,0.8);
+    border: 2px solid rgba(0,0,0,0.8);
     opacity: 0;
     transition: opacity 0.3s ease;
     pointer-events: none;
   }
   .bottom-nav-home.home-active::after {
     opacity: 1;
+  }
+  [data-theme="dark"] .bottom-nav-home::after {
+    border-color: rgba(255,255,255,0.8);
   }
 }
 </style>
