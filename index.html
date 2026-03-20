@@ -3473,14 +3473,21 @@ function saveHistory() {
 
 // Save current week session when switching or closing
 function saveCurrentWeekToHistory() {
-  const doneSets = Object.entries(sessionSets).filter(([k, s]) => s?.done);
-  if (doneSets.length === 0) return;
   const weekKey = getCurrentWeekKey();
+  const doneSets = Object.entries(sessionSets).filter(([k, s]) => s?.done);
+  if (doneSets.length === 0) {
+    if (history[weekKey]) {
+      delete history[weekKey];
+      saveHistory();
+    }
+    return;
+  }
   if (!history[weekKey]) {
     history[weekKey] = { sets: {}, days: JSON.parse(JSON.stringify(state.days)), dayNotes: JSON.parse(JSON.stringify(state.dayNotes || Array(7).fill(''))) };
   } else if (!history[weekKey].dayNotes) {
     history[weekKey].dayNotes = JSON.parse(JSON.stringify(state.dayNotes || Array(7).fill('')));
   }
+  history[weekKey].sets = {};
   Object.entries(sessionSets).forEach(([k, v]) => {
     history[weekKey].sets[k] = v;
   });
@@ -3547,8 +3554,7 @@ function openPanel(panel) {
     const mBtn = document.getElementById('mobileNav' + key);
     if (mBtn) mBtn.classList.toggle('active', p === panel);
   });
-  const homeBtn = document.getElementById('mobileNavHome');
-  if (homeBtn) homeBtn.classList.remove('home-active');
+  updateHomeBtn();
 }
 
 function openSidebar() { openPanel('history'); }
@@ -3567,8 +3573,7 @@ function closeSidebar() {
     const mBtn = document.getElementById('mobileNav' + p);
     if (mBtn) mBtn.classList.remove('active');
   });
-  const homeBtn = document.getElementById('mobileNavHome');
-  if (homeBtn) homeBtn.classList.add('home-active');
+  updateHomeBtn();
   updateMainScroll();
 }
 
@@ -4837,6 +4842,7 @@ function render() {
   document.getElementById('readonlyBanner').style.display = isReadonly ? '' : 'none';
   updateTimerBar();
   updateMainScroll();
+  updateHomeBtn();
   _isDragging = false;
 }
 
@@ -5671,14 +5677,26 @@ function applyIcons() {
   if (shi) shi.innerHTML = ICONS.settings;
 }
 
+function updateHomeBtn() {
+  const homeBtn = document.getElementById('mobileNavHome');
+  if (!homeBtn) return;
+  const isToday = viewingWeek === null && activeDay === getTodayIndex();
+  homeBtn.classList.toggle('home-active', activePanel === null && isToday);
+}
+
 function goHome() {
-  closeSidebar();
-  viewingWeek = null;
-  activeDay = getTodayIndex();
-  render();
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-  const main = document.querySelector('.main');
-  if (main) main.scrollTo({ top: 0, behavior: 'smooth' });
+  if (activePanel !== null) {
+    // Farklı tab'deyse → sadece kapat, kullanıcının son konumunu koru
+    closeSidebar();
+  } else {
+    // Zaten ana sayfadaysa → bugüne git ve en başa kaydır
+    viewingWeek = null;
+    activeDay = getTodayIndex();
+    render();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    const main = document.querySelector('.main');
+    if (main) main.scrollTo({ top: 0, behavior: 'smooth' });
+  }
 }
 
 const EXERCISE_LIBRARY = {
@@ -6608,14 +6626,20 @@ function toggleTheme() {
 document.addEventListener('visibilitychange', () => { if (document.hidden) saveCurrentWeekToHistory(); });
 window.addEventListener('beforeunload', saveCurrentWeekToHistory);
 
+function clearAllData() {
+  sessionSets = {};
+  window.removeEventListener('beforeunload', saveCurrentWeekToHistory);
+  localStorage.clear();
+  location.reload();
+}
+
 document.documentElement.style.visibility = 'hidden';
 document.body.classList.add('preload');
 render();
 applyI18n();
 window.addEventListener('load', () => {
   applyIcons();
-  const homeBtn = document.getElementById('mobileNavHome');
-  if (homeBtn) homeBtn.classList.add('home-active');
+  updateHomeBtn();
   requestAnimationFrame(() => requestAnimationFrame(() => {
     document.body.classList.remove('preload');
     document.documentElement.style.visibility = '';
@@ -6805,7 +6829,7 @@ if ('serviceWorker' in navigator) {
   .bottom-nav-home::after {
     content: '';
     position: absolute;
-    inset: -4px;
+    inset: -3px;
     border-radius: 50%;
     border: 2px solid rgba(0,0,0,0.8);
     opacity: 0;
