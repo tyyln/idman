@@ -254,6 +254,7 @@
     border: none;
     border-radius: 14px;
     margin-bottom: 16px;
+    min-height: 56px;
   }
   .timer-btn {
     width: 36px; height: 36px;
@@ -1129,6 +1130,7 @@
         <option value="en">🇬🇧 English</option>
         <option value="tr">🇹🇷 Türkçe</option>
         <option value="az">🇦🇿 Azərbaycan</option>
+        <option value="id">🇮🇩 Bahasa Indonesia</option>
         <option value="bg">🇧🇬 Български</option>
         <option value="cs">🇨🇿 Čeština</option>
         <option value="da">🇩🇰 Dansk</option>
@@ -1136,13 +1138,11 @@
         <option value="el">🇬🇷 Ελληνικά</option>
         <option value="es">🇪🇸 Español</option>
         <option value="es-419">🇲🇽 Español Latino</option>
-        <option value="fi">🇫🇮 Suomi</option>
         <option value="fr">🇫🇷 Français</option>
-        <option value="hu">🇭🇺 Magyar</option>
-        <option value="id">🇮🇩 Bahasa Indonesia</option>
         <option value="it">🇮🇹 Italiano</option>
         <option value="ja">🇯🇵 日本語</option>
         <option value="ko">🇰🇷 한국어</option>
+        <option value="hu">🇭🇺 Magyar</option>
         <option value="nl">🇳🇱 Nederlands</option>
         <option value="no">🇳🇴 Norsk</option>
         <option value="pl">🇵🇱 Polski</option>
@@ -1150,10 +1150,11 @@
         <option value="pt-BR">🇧🇷 Português Brasileiro</option>
         <option value="ro">🇷🇴 Română</option>
         <option value="ru">🇷🇺 Русский</option>
+        <option value="fi">🇫🇮 Suomi</option>
         <option value="sv">🇸🇪 Svenska</option>
-        <option value="th">🇹🇭 ภาษาไทย</option>
-        <option value="uk">🇺🇦 Українська</option>
         <option value="vi">🇻🇳 Tiếng Việt</option>
+        <option value="uk">🇺🇦 Українська</option>
+        <option value="th">🇹🇭 ภาษาไทย</option>
         <option value="zh-CN">🇨🇳 简体中文</option>
         <option value="zh-TW">🇹🇼 繁體中文</option>
       </select>
@@ -3508,34 +3509,44 @@ function saveCurrentWeekToHistory() {
 let activePanel = null;
 
 function openPanel(panel) {
-  if (activePanel === panel) { closeSidebar(); return; }
+  if (activePanel === panel) return;
   activePanel = panel;
-  if (panel === 'history') saveCurrentWeekToHistory();
-  document.getElementById('sidebar').classList.add('open');
-  document.getElementById('sidebarOverlay').classList.add('open');
-  unlockScroll();
-  document.body.style.overflow = 'hidden';
-  ['history','progress','weight'].forEach(p => {
+  // Settings paneli → settingsOverlay üzerinden
+  if (panel === 'settings') {
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('sidebarOverlay').classList.remove('open');
+    document.getElementById('settingsOverlay').classList.add('open');
+    unlockScroll();
+    document.body.style.overflow = 'hidden';
+    renderAccentSwatches();
+  } else {
+    document.getElementById('settingsOverlay').classList.remove('open');
+    if (panel === 'history') saveCurrentWeekToHistory();
+    document.getElementById('sidebar').classList.add('open');
+    document.getElementById('sidebarOverlay').classList.add('open');
+    unlockScroll();
+    document.body.style.overflow = 'hidden';
+    const titleEl = document.getElementById('sidebarTitle');
+    if (titleEl) {
+      const iconSvg = ICONS[panel] || '';
+      titleEl.innerHTML = `<span style="display:inline-flex;align-items:center;gap:8px;vertical-align:middle">${iconSvg} ${t(panel + 'Panel')}</span>`;
+    }
+    if (panel === 'history') renderSidebar();
+    else if (panel === 'progress') renderProgressPanel();
+    else if (panel === 'weight') renderWeightPanel();
+    requestAnimationFrame(() => {
+      const sb = document.getElementById('sidebarBody');
+      if (sb) sb.scrollTop = 0;
+    });
+    initSidebarSwipe();
+  }
+  ['history','progress','weight','settings'].forEach(p => {
     const key = p.charAt(0).toUpperCase() + p.slice(1);
     const btn = document.getElementById('navBtn' + key);
     if (btn) btn.classList.toggle('active', p === panel);
     const mBtn = document.getElementById('mobileNav' + key);
     if (mBtn) mBtn.classList.toggle('active', p === panel);
   });
-  const titleEl = document.getElementById('sidebarTitle');
-  if (titleEl) {
-    const iconSvg = ICONS[panel] || '';
-    titleEl.innerHTML = `<span style="display:inline-flex;align-items:center;gap:8px;vertical-align:middle">${iconSvg} ${t(panel + 'Panel')}</span>`;
-  }
-  if (panel === 'history') renderSidebar();
-  else if (panel === 'progress') renderProgressPanel();
-  else if (panel === 'weight') renderWeightPanel();
-  // Her panel açılışında en üste scroll
-  requestAnimationFrame(() => {
-    const sb = document.getElementById('sidebarBody');
-    if (sb) sb.scrollTop = 0;
-  });
-  initSidebarSwipe();
 }
 
 function openSidebar() { openPanel('history'); }
@@ -3546,8 +3557,9 @@ function closeSidebar() {
   sidebar.classList.remove('open');
   if (sidebar._swipeInit) { sidebar._swipeInit = false; }
   document.getElementById('sidebarOverlay').classList.remove('open');
+  document.getElementById('settingsOverlay').classList.remove('open');
   document.body.style.overflow = '';
-  ['History','Progress','Weight'].forEach(p => {
+  ['History','Progress','Weight','Settings'].forEach(p => {
     const btn = document.getElementById('navBtn' + p);
     if (btn) btn.classList.remove('active');
     const mBtn = document.getElementById('mobileNav' + p);
@@ -4045,56 +4057,56 @@ function exGroupLabel(group) {
 }
 
 const BIO_METRICS = [
-  { id:'height',   unit:()=>lengthUnit, once:true,
+  { key:'height',   unit:()=>lengthUnit, once:true,
     tr:'Boy',             en:'Height',          de:'Körpergröße',       fr:'Taille',             es:'Altura',
     it:'Altezza',         pt:'Altura',          'pt-BR':'Altura',       ru:'Рост',               pl:'Wzrost',
     nl:'Lengte',          sv:'Längd',           no:'Høyde',             da:'Højde',              fi:'Pituus',
     cs:'Výška',           ro:'Înălțime',        hu:'Magasság',          el:'Ύψος',               bg:'Ръст',
     uk:'Зріст',           id:'Tinggi Badan',    vi:'Chiều cao',         az:'Boy',                ja:'身長',
     ko:'신장',            'zh-CN':'身高',       'zh-TW':'身高',         th:'ส่วนสูง',            'es-419':'Altura' },
-  { id:'bodyfat',  unit:()=>'%',        once:false,
+  { key:'bodyfat',  unit:()=>'%',        once:false,
     tr:'Vücut Yağ Oranı', en:'Body Fat',        de:'Körperfettanteil',  fr:'Graisse corporelle', es:'Grasa corporal',
     it:'Grasso corporeo', pt:'Gordura corporal','pt-BR':'Gordura corporal',ru:'Жировая масса',  pl:'Tkanka tłuszczowa',
     nl:'Vetpercentage',   sv:'Kroppsfett',      no:'Kroppsfett',        da:'Kropsfedt',          fi:'Rasvaprosentti',
     cs:'Tělesný tuk',     ro:'Grăsime corp.',   hu:'Testzsír',          el:'Σωματικό λίπος',     bg:'Телесни мазнини',
     uk:'Жирова маса',     id:'Lemak tubuh',     vi:'Mỡ cơ thể',         az:'Bədən yağı',         ja:'体脂肪',
     ko:'체지방',          'zh-CN':'体脂率',     'zh-TW':'體脂率',       th:'ไขมันร่างกาย',       'es-419':'Grasa corporal' },
-  { id:'waist',    unit:()=>lengthUnit, once:false,
+  { key:'waist',    unit:()=>lengthUnit, once:false,
     tr:'Bel Çevresi',     en:'Waist',           de:'Taillenumfang',     fr:'Tour de taille',     es:'Cintura',
     it:'Vita',            pt:'Cintura',         'pt-BR':'Cintura',      ru:'Талия',              pl:'Talia',
     nl:'Taille',          sv:'Midja',           no:'Midje',             da:'Talje',              fi:'Vyötärö',
     cs:'Pas',             ro:'Talie',           hu:'Derék',             el:'Μέση',               bg:'Талия',
     uk:'Талія',           id:'Pinggang',        vi:'Vòng eo',           az:'Bel',                ja:'腹囲',
     ko:'허리',            'zh-CN':'腰围',       'zh-TW':'腰圍',         th:'รอบเอว',             'es-419':'Cintura' },
-  { id:'shoulder', unit:()=>lengthUnit, once:false,
+  { key:'shoulder', unit:()=>lengthUnit, once:false,
     tr:'Omuz Genişliği',  en:'Shoulders',       de:'Schulterbreite',    fr:'Largeur épaules',    es:'Hombros',
     it:'Spalle',          pt:'Ombros',          'pt-BR':'Ombros',       ru:'Плечи',              pl:'Barki',
     nl:'Schouders',       sv:'Axlar',           no:'Skuldre',           da:'Skuldre',            fi:'Hartiat',
     cs:'Ramena',          ro:'Umeri',           hu:'Vállak',            el:'Ώμοι',               bg:'Рамена',
     uk:'Плечі',           id:'Bahu',            vi:'Vai',               az:'Çiyinlər',           ja:'肩幅',
     ko:'어깨',            'zh-CN':'肩宽',       'zh-TW':'肩寬',         th:'ไหล่',               'es-419':'Hombros' },
-  { id:'arm',      unit:()=>lengthUnit, once:false,
+  { key:'arm',      unit:()=>lengthUnit, once:false,
     tr:'Kol Çevresi',     en:'Arm',             de:'Armumfang',         fr:'Tour de bras',       es:'Brazo',
     it:'Braccio',         pt:'Braço',           'pt-BR':'Braço',        ru:'Рука',               pl:'Ramię',
     nl:'Arm',             sv:'Arm',             no:'Arm',               da:'Arm',                fi:'Käsivarsi',
     cs:'Paže',            ro:'Braț',            hu:'Kar',               el:'Βραχίονας',          bg:'Ръка',
     uk:'Рука',            id:'Lengan',          vi:'Cánh tay',          az:'Qol',                ja:'腕囲',
     ko:'팔',              'zh-CN':'臂围',       'zh-TW':'臂圍',         th:'แขน',                'es-419':'Brazo' },
-  { id:'chest',    unit:()=>lengthUnit, once:false,
+  { key:'chest',    unit:()=>lengthUnit, once:false,
     tr:'Göğüs Çevresi',   en:'Chest',           de:'Brustumfang',       fr:'Tour de poitrine',   es:'Pecho',
     it:'Petto',           pt:'Peito',           'pt-BR':'Peitoral',     ru:'Грудь',              pl:'Klatka',
     nl:'Borst',           sv:'Bröst',           no:'Bryst',             da:'Bryst',              fi:'Rintakehä',
     cs:'Hrudník',         ro:'Piept',           hu:'Mellkas',           el:'Στήθος',             bg:'Гърди',
     uk:'Груди',           id:'Dada',            vi:'Vòng ngực',         az:'Sinə',               ja:'胸囲',
     ko:'가슴',            'zh-CN':'胸围',       'zh-TW':'胸圍',         th:'อก',                 'es-419':'Pecho' },
-  { id:'hip',      unit:()=>lengthUnit, once:false,
+  { key:'hip',      unit:()=>lengthUnit, once:false,
     tr:'Kalça Çevresi',   en:'Hip',             de:'Hüftumfang',        fr:'Tour de hanches',    es:'Cadera',
     it:'Fianchi',         pt:'Quadril',         'pt-BR':'Quadril',      ru:'Бёдра',              pl:'Biodra',
     nl:'Heupen',          sv:'Höfter',          no:'Hofter',            da:'Hofter',             fi:'Lantio',
     cs:'Boky',            ro:'Șolduri',         hu:'Csípő',             el:'Γοφοί',              bg:'Бедра',
     uk:'Стегна',          id:'Pinggul',         vi:'Vòng hông',         az:'Bud',                ja:'腰囲',
     ko:'엉덩이',          'zh-CN':'臀围',       'zh-TW':'臀圍',         th:'สะโพก',              'es-419':'Cadera' },
-  { id:'thigh',    unit:()=>lengthUnit, once:false,
+  { key:'thigh',    unit:()=>lengthUnit, once:false,
     tr:'Uyluk Çevresi',   en:'Thigh',           de:'Oberschenkel',      fr:'Tour de cuisse',     es:'Muslo',
     it:'Coscia',          pt:'Coxa',            'pt-BR':'Coxa',         ru:'Бедро',              pl:'Udo',
     nl:'Dij',             sv:'Lår',             no:'Lår',               da:'Lår',                fi:'Reisi',
@@ -4311,9 +4323,9 @@ function renderWeightPanel() {
     }
 
     BIO_METRICS.forEach(metric => {
-      const entries = bioLog[metric.id] || [];
+      const entries = bioLog[metric.key] || [];
       const latest = entries.length > 0 ? entries[entries.length - 1] : null;
-      const isHeightInInches = metric.id === 'height' && lengthUnit === 'in';
+      const isHeightInInches = metric.key === 'height' && lengthUnit === 'in';
 
       let latestDisplay = '', latestNum = '', latestUnit = metric.unit();
       if (latest) {
@@ -4334,7 +4346,7 @@ function renderWeightPanel() {
         const resetBtn = document.createElement('button');
         resetBtn.innerHTML = '✕';
         resetBtn.style.cssText = 'position:absolute;top:8px;right:8px;background:none;border:none;color:var(--text-muted);font-size:12px;cursor:pointer;padding:2px 4px;line-height:1;';
-        resetBtn.onclick = () => deleteBioEntry(metric.id);
+        resetBtn.onclick = () => deleteBioEntry(metric.key);
         card.appendChild(resetBtn);
       }
 
@@ -4371,11 +4383,11 @@ function renderWeightPanel() {
       } else {
         inputWrap.style.cssText = 'display:flex;gap:5px;align-items:center';
         inputWrap.innerHTML = `
-          <style>#bio-${metric.id}::-webkit-outer-spin-button,#bio-${metric.id}::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}</style>
-          <input id="bio-${metric.id}" type="number" inputmode="decimal" step="0.1" min="0"
+          <style>#bio-${metric.key}::-webkit-outer-spin-button,#bio-${metric.key}::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}</style>
+          <input id="bio-${metric.key}" type="number" inputmode="decimal" step="0.1" min="0"
             placeholder="${latest ? latest.val : metric.unit()}"
             style="flex:1;padding:7px 8px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;-webkit-appearance:none;-moz-appearance:textfield;min-width:0;box-sizing:border-box">
-          <button onclick="addBioEntry('${metric.id}')" style="padding:7px 8px;border-radius:8px;border:none;background:var(--accent);color:#fff;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap">${lang === 'tr' ? '✓' : '✓'}</button>
+          <button onclick="addBioEntry('${metric.key}')" style="padding:7px 8px;border-radius:8px;border:none;background:var(--accent);color:#fff;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap">${lang === 'tr' ? '✓' : '✓'}</button>
         `;
       }
       card.appendChild(inputWrap);
@@ -5932,6 +5944,7 @@ function setLengthUnit(unit) {
 }
 
 function openSettings() {
+  if (window.innerWidth <= 600) { openPanel('settings'); return; }
   document.getElementById('settingsOverlay').classList.add('open');
   unlockScroll();
   document.body.style.overflow = 'hidden';
@@ -6013,6 +6026,7 @@ function initSettingsSwipe() {
 }
 
 function initSidebarSwipe() {
+  if (window.innerWidth <= 600) return;
   const sidebar = document.getElementById('sidebar');
   if (!sidebar || sidebar._swipeInit) return;
   sidebar._swipeInit = true;
@@ -6027,10 +6041,10 @@ function initSidebarSwipe() {
   }, { passive: true });
 
   sidebar.addEventListener('touchend', e => {
-    const dy = e.changedTouches[0].clientY - startY;
-    const dx = Math.abs(e.changedTouches[0].clientX - startX);
-    // Aşağı swipe, yatay değil, ve scroll en üstteydi
-    if (dy > 80 && dx < 60 && startScrollTop <= 0) {
+    const dx = e.changedTouches[0].clientX - startX;
+    const dy = Math.abs(e.changedTouches[0].clientY - startY);
+    // Sağa swipe, dikey değil → sayfayı kapat
+    if (dx > 80 && dy < 60) {
       closeSidebar();
     }
   }, { passive: true });
@@ -6614,32 +6628,69 @@ if ('serviceWorker' in navigator) {
   .app-layout { display: block !important; width: 100% !important; overflow-x: hidden !important; }
   .left-col { display: none !important; }
 
-  /* Sidebar → bottom sheet on mobile */
+  /* Sidebar → tab sayfası on mobile */
   .sidebar {
     left: 0 !important;
     right: 0 !important;
-    top: auto !important;
-    bottom: 0 !important;
+    top: 0 !important;
+    bottom: calc(64px + env(safe-area-inset-bottom)) !important;
     width: 100% !important;
-    height: calc(100vh - 64px - env(safe-area-inset-bottom)) !important;
-    max-height: calc(100vh - 64px - env(safe-area-inset-bottom)) !important;
+    height: auto !important;
+    max-height: none !important;
     border-right: none !important;
-    border-top: 1px solid var(--border-light) !important;
-    border-radius: 20px 20px 0 0 !important;
-    transform: translateY(100%) !important;
-    transition: transform 0.35s cubic-bezier(0.4,0,0.2,1) !important;
-    will-change: transform !important;
+    border-top: none !important;
+    border-radius: 0 !important;
+    transform: none !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+    transition: none !important;
     box-shadow: none !important;
     z-index: 20 !important;
     overflow: hidden !important;
   }
   .sidebar.open {
-    transform: translateY(0) !important;
-    box-shadow: 0 -8px 32px rgba(0,0,0,0.18) !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    transform: none !important;
+    box-shadow: none !important;
   }
-  [data-theme="dark"] .sidebar.open {
-    box-shadow: 0 -8px 32px rgba(0,0,0,0.5) !important;
+  .sidebar-overlay, .sidebar-overlay.open {
+    display: none !important;
+    pointer-events: none !important;
   }
+  .sidebar-handle-bar { display: none !important; }
+  .sidebar-close { display: none !important; }
+
+  /* Settings → tam sayfa tab */
+  .settings-overlay {
+    background: var(--bg) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    align-items: stretch !important;
+    justify-content: stretch !important;
+    opacity: 1 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    transition: none !important;
+    z-index: 20 !important;
+    bottom: calc(64px + env(safe-area-inset-bottom)) !important;
+  }
+  .settings-overlay.open {
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: all !important;
+  }
+  .settings-sheet {
+    border-radius: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    flex: 1 !important;
+    transform: none !important;
+    transition: none !important;
+    box-shadow: none !important;
+    overflow-y: auto !important;
+  }
+  .settings-sheet-handle { display: none !important; }
 
   body { overscroll-behavior-y: none !important; }
   .main {
@@ -6751,7 +6802,7 @@ if ('serviceWorker' in navigator) {
   <button class="bottom-nav-btn" id="mobileNavProgress" onclick="openPanel('progress')"></button>
   <button class="bottom-nav-btn bottom-nav-home" id="mobileNavHome" onclick="goHome()"></button>
   <button class="bottom-nav-btn" id="mobileNavWeight" onclick="openPanel('weight')"></button>
-  <button class="bottom-nav-btn" id="mobileNavSettings" onclick="openSettings()"></button>
+  <button class="bottom-nav-btn" id="mobileNavSettings" onclick="openPanel('settings')"></button>
 </div>
 
 <div class="overlay" id="newWorkoutConfirmOverlay" onclick="if(event.target===this)closeNewWorkoutConfirm()" style="align-items:center">
