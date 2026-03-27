@@ -4235,8 +4235,7 @@ function renderWeightPanel() {
     const inputRow = document.createElement('div');
     inputRow.style.cssText = 'display:flex;gap:8px;padding:16px;align-items:center';
     inputRow.innerHTML = `
-      <style>#weightInput::-webkit-outer-spin-button,#weightInput::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}#weightInput{-moz-appearance:textfield}</style>
-      <input id="weightInput" type="number" inputmode="decimal" step="0.1" min="0"
+      <input id="weightInput" type="text" inputmode="decimal"
         placeholder="${t('weightPlaceholder')}"
         style="flex:1;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:15px;">
       <span style="color:var(--text-secondary);font-size:13px">${weightUnit}</span>
@@ -4384,7 +4383,7 @@ function renderWeightPanel() {
           <input id="bio-height-ft" type="number" inputmode="numeric" min="0" max="8" placeholder="${latestFt || 'ft'}"
             style="width:38px;padding:7px 6px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;-webkit-appearance:none;-moz-appearance:textfield;text-align:center;box-sizing:border-box">
           <span style="font-size:11px;color:var(--text-secondary)">'</span>
-          <input id="bio-height-in" type="number" inputmode="decimal" min="0" max="11.9" step="0.1" placeholder="${latestIn || 'in'}"
+          <input id="bio-height-in" type="text" inputmode="decimal" placeholder="${latestIn || 'in'}"
             style="width:38px;padding:7px 6px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;-webkit-appearance:none;-moz-appearance:textfield;text-align:center;box-sizing:border-box">
           <span style="font-size:11px;color:var(--text-secondary)">"</span>
           <button onclick="addBioEntryFtIn()" style="flex:1;padding:7px 4px;border-radius:8px;border:none;background:var(--accent);color:#fff;font-size:11px;font-weight:600;cursor:pointer">${lang === 'tr' ? '✓' : '✓'}</button>
@@ -4392,8 +4391,7 @@ function renderWeightPanel() {
       } else {
         inputWrap.style.cssText = 'display:flex;gap:5px;align-items:center';
         inputWrap.innerHTML = `
-          <style>#bio-${metric.key}::-webkit-outer-spin-button,#bio-${metric.key}::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}</style>
-          <input id="bio-${metric.key}" type="number" inputmode="decimal" step="0.1" min="0"
+          <input id="bio-${metric.key}" type="text" inputmode="decimal"
             placeholder="${latest ? latest.val : metric.unit()}"
             style="flex:1;padding:7px 8px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;-webkit-appearance:none;-moz-appearance:textfield;min-width:0;box-sizing:border-box">
           <button onclick="addBioEntry('${metric.key}')" style="padding:7px 8px;border-radius:8px;border:none;background:var(--accent);color:#fff;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap">${lang === 'tr' ? '✓' : '✓'}</button>
@@ -4432,8 +4430,12 @@ function displayWeight(kg) {
   return kg;
 }
 
+function parseDecimal(s) {
+  return parseFloat(String(s).replace(',', '.'));
+}
+
 function addWeightEntry() {
-  const val = parseFloat(document.getElementById('weightInput')?.value);
+  const val = parseDecimal(document.getElementById('weightInput')?.value);
   if (!val || val <= 0) return;
   const kg = weightUnit === 'lbs' ? Math.round(val / 2.20462 * 100) / 100 : val;
   const log = loadWeightLog();
@@ -4481,7 +4483,7 @@ function deleteBioEntry(metricId) {
 function addBioEntry(metricId) {
   const input = document.getElementById(`bio-${metricId}`);
   if (!input) return;
-  const val = parseFloat(input.value);
+  const val = parseDecimal(input.value);
   if (!val || val <= 0) return;
   const bioLog = loadBioLog();
   if (!bioLog[metricId]) bioLog[metricId] = [];
@@ -4496,7 +4498,7 @@ function addBioEntry(metricId) {
 
 function addBioEntryFtIn() {
   const ft = parseInt(document.getElementById('bio-height-ft')?.value) || 0;
-  const inch = parseFloat(document.getElementById('bio-height-in')?.value) || 0;
+  const inch = parseDecimal(document.getElementById('bio-height-in')?.value) || 0;
   if (ft === 0 && inch === 0) return;
   const cm = Math.round(((ft * 12) + inch) * 2.54 * 10) / 10;
   const bioLog = loadBioLog();
@@ -4930,6 +4932,7 @@ function updateTimerBar() {
       // Currently running
       timerBtn.style.display = '';
       timerDisplay.style.display = '';
+      timerDisplay.style.color = '';
       timerLabel.style.display = 'none';
       newWorkoutBtn.style.display = 'none';
       viewSummaryBtn.style.display = 'none';
@@ -4938,7 +4941,9 @@ function updateTimerBar() {
     } else if (workoutElapsedOnStop > 0) {
       // Stopped, has a previous session
       timerBtn.style.display = 'none';
-      timerDisplay.style.display = 'none';
+      timerDisplay.style.display = '';
+      timerDisplay.textContent = formatSeconds(workoutElapsedOnStop);
+      timerDisplay.style.color = 'var(--text-secondary)';
       timerLabel.style.display = 'none';
       newWorkoutBtn.style.display = 'block';
       viewSummaryBtn.style.display = 'block';
@@ -5224,7 +5229,7 @@ function renderContent() {
           <div class="set-row ${done ? 'set-done' : ''}" id="setrow-${ei}-${s}">
             <span class="set-label">${t('setLabel', s+1)}</span>
             <div class="set-input-group">
-              <input class="set-input" type="number" inputmode="decimal" id="kg-${ei}-${s}" placeholder="${savedKg === '' ? lastKg : ''}" value="${savedKg}" min="0" step="2.5" ${done ? 'disabled' : ''}>
+              <input class="set-input" type="text" inputmode="decimal" id="kg-${ei}-${s}" placeholder="${savedKg === '' ? lastKg : ''}" value="${savedKg}" ${done ? 'disabled' : ''}>
               <span class="set-input-label weight-unit-label">${weightUnit}</span>
               <input class="set-input" type="text" inputmode="numeric" id="reps-${ei}-${s}" placeholder="${savedReps === '' ? lastReps : ''}" value="${savedReps}" ${done ? 'disabled' : ''}>
               <span class="set-input-label">${t('repsUnit')}</span>
@@ -5453,7 +5458,7 @@ function preserveInputValues(ei) {
     const kgVal = kgEl?.value.trim() ?? '';
     const repsVal = repsEl?.value.trim() ?? '';
     if (kgVal !== '' || repsVal !== '') {
-      sessionSets[key] = { kg: kgVal !== '' ? parseFloat(kgVal) : undefined, reps: repsVal !== '' ? repsVal : undefined, done: false };
+      sessionSets[key] = { kg: kgVal !== '' ? parseDecimal(kgVal) : undefined, reps: repsVal !== '' ? repsVal : undefined, done: false };
     }
   }
   saveSession();
@@ -5477,7 +5482,7 @@ function completeSet(ei, si) {
   const repsEl = document.getElementById(`reps-${ei}-${si}`);
   const kgVal = kgEl.value.trim();
   const repsVal = repsEl.value.trim();
-  const kg = kgVal !== '' ? parseFloat(kgVal) : (parseFloat(kgEl.placeholder) || 0);
+  const kg = kgVal !== '' ? parseDecimal(kgVal) : (parseDecimal(kgEl.placeholder) || 0);
   const reps = repsVal !== '' ? repsVal : (repsEl.placeholder || '0');
 
   sessionSets[key] = { kg, reps, done: true };
@@ -6144,6 +6149,7 @@ function toggleWorkout() {
     document.getElementById('timerBtn').style.display = '';
     document.getElementById('timerBtn').classList.add('running');
     document.getElementById('timerDisplay').style.display = '';
+    document.getElementById('timerDisplay').style.color = '';
     document.getElementById('timerDisplay').textContent = '00:00';
     document.getElementById('timerLabel').style.display = 'none';
     document.getElementById('newWorkoutBtn').style.display = 'none';
@@ -6162,7 +6168,10 @@ function toggleWorkout() {
     workoutPausedElapsed = 0;
     document.getElementById('timerBtn').classList.remove('running');
     document.getElementById('timerBtn').style.display = 'none';
-    document.getElementById('timerDisplay').style.display = 'none';
+    const _td = document.getElementById('timerDisplay');
+    _td.textContent = formatSeconds(elapsed);
+    _td.style.display = '';
+    _td.style.color = 'var(--text-secondary)';
     document.getElementById('timerLabel').style.display = 'none';
     document.getElementById('pauseBtn').style.display = 'none';
     document.getElementById('newWorkoutBtn').style.display = 'block';
@@ -6416,6 +6425,7 @@ function startNewWorkout() {
   document.getElementById('timerBtn').classList.remove('running');
   
   document.getElementById('timerDisplay').style.display = '';
+  document.getElementById('timerDisplay').style.color = '';
   document.getElementById('timerDisplay').textContent = '00:00';
   document.getElementById('timerLabel').style.display = '';
   document.getElementById('timerLabel').textContent = t('startWorkout');
@@ -6428,6 +6438,7 @@ function resumeWorkout() {
   document.getElementById('timerBtn').style.display = '';
   document.getElementById('timerBtn').classList.add('running');
   document.getElementById('timerDisplay').style.display = '';
+  document.getElementById('timerDisplay').style.color = '';
   document.getElementById('timerLabel').style.display = 'none';
   workoutActive = true;
   workoutPaused = false;
@@ -6447,14 +6458,17 @@ function closeWorkoutSummary() {
   setTimeout(() => document.getElementById('workoutSummaryOverlay').classList.remove('open'), 250);
 }
 
+function formatSeconds(sec) {
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+  const pad = n => String(n).padStart(2, '0');
+  return h > 0 ? `${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
+}
+
 function updateTimerDisplay() {
   const elapsed = workoutPausedElapsed + Math.floor((Date.now() - workoutStartTime) / 1000);
-  const h = Math.floor(elapsed / 3600);
-  const m = Math.floor((elapsed % 3600) / 60);
-  const s = elapsed % 60;
-  const pad = n => String(n).padStart(2, '0');
-  document.getElementById('timerDisplay').textContent =
-    h > 0 ? `${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
+  document.getElementById('timerDisplay').textContent = formatSeconds(elapsed);
 }
 
 // ── ACCENT COLOR ──
@@ -6831,16 +6845,13 @@ if ('serviceWorker' in navigator) {
     position: absolute;
     inset: -3px;
     border-radius: 50%;
-    border: 2px solid rgba(0,0,0,0.8);
+    border: 2px solid var(--accent);
     opacity: 0;
     transition: opacity 0.3s ease;
     pointer-events: none;
   }
   .bottom-nav-home.home-active::after {
-    opacity: 1;
-  }
-  [data-theme="dark"] .bottom-nav-home::after {
-    border-color: rgba(255,255,255,0.8);
+    opacity: 0.5;
   }
 }
 </style>
